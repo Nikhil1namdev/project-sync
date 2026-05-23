@@ -3,6 +3,7 @@ import Thead from '../../components/ListComponents/Thead';
 import TRow from '../../components/ListComponents/TRow';
 import axios from 'axios';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
+import { showToast } from '../../utils/toast.js';
 
 const ListFeature = () => {
   const [rows, setRows] = useState([]);
@@ -43,7 +44,7 @@ const ListFeature = () => {
       setRows((prevRows) => [response.data, ...prevRows]);
 
       setButton(true);
-      alert('Data added successfully!');
+      showToast.success('Data added successfully!');
       setNewRow({
         Types: '',
         Key: '',
@@ -57,7 +58,7 @@ const ListFeature = () => {
       });
     } catch (error) {
       console.error('Error adding new data:', error);
-      alert('Failed to add data.');
+      showToast.error('Failed to add data.');
     }
   };
 

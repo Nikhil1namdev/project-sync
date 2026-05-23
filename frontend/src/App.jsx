@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
@@ -18,10 +18,13 @@ import FinalDashboard from './pages/UserDashboard/FinalDashboard'
 import JiraDashboard from './pages/JiraDashboard/JiraDashboard'
 import PricingPage from './pages/PricingPage/PricingPage'
 import ToDolist from './features/ToDolist'
+import { Toaster } from 'react-hot-toast'
+
 function App() {
 
   return (
     <>
+    <Toaster position="bottom-right" reverseOrder={false} />
     <LoginProvider>
      <GoogleOAuthProvider clientId="295710850192-us1jv41mns6mhknr0tp95qdcbnlrbl77.apps.googleusercontent.com">
 
