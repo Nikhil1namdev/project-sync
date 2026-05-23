@@ -2,7 +2,7 @@ import React from 'react'
 
 const LoginOne = () => {
   const googleLogin=()=>{
-    window.open('https://localHost:5000/auth/google','_self')
+    window.open('https://localHost:8000/auth/google','_self')
   }
   return (
     <>

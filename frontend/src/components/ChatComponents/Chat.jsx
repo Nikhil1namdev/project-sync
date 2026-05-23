@@ -2,32 +2,38 @@ import React, { useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
 
-const socket = io('http://localhost:5000'); // backend URL
+// INTERVIEW NOTE: Establishes a persistent TCP WebSocket handshake connection with Port 8000
+const socket = io('http://localhost:8000'); // backend URL
 
 const Chat = () => {
   const [message, setMessage] = useState('');
   const [chatMessages, setChatMessages] = useState([]);
   const {User,setUser}=useContext(LoginContext);
+  
   useEffect(() => {
-    // Listen for incoming messages
+    // INTERVIEW NOTE: socket.on() mounts a dynamic event listener on the client.
+    // When the backend broadcasts a "receiveMessage" payload, it triggers this callback
+    // and appends the new message object ({content, sender}) to our local chat state.
     socket.on('receiveMessage', (data) => {
       setChatMessages((prev) => [...prev, data]);
     });
 
-    // Clean up the listener
+    // Clean up the listener on unmount to avoid memory leaks and duplicate triggers
     return () => {
       socket.off('receiveMessage');
     };
   }, []);
 
+  // INTERVIEW NOTE: Emits the "sendMessage" event with a custom data payload to the backend
   const sendMessage = (e) => {
     e.preventDefault();
     if (message.trim()) {
       const messageData = {
         content: message,
-        sender: User, // Replace with dynamic user info if needed
+        sender: User, // Dynamic active user read from global login context
       };
 
+      // Dispatches the payload over the persistent websocket channel to the server
       socket.emit('sendMessage', messageData);
       setMessage('');
     }

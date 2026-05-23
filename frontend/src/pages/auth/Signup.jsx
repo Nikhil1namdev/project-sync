@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const SignUp = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -15,7 +18,7 @@ const SignUp = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
@@ -23,8 +26,18 @@ const SignUp = () => {
       return;
     }
 
-    console.log("User Registered:", formData);
-    alert("SignUp successful!");
+    try {
+      const response = await axios.post('http://localhost:8000/auth/Signup', {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password
+      });
+      alert(response.data.message || "SignUp successful!");
+      navigate('/Login');
+    } catch (error) {
+      console.error(error);
+      alert(error.response?.data?.message || "Signup failed");
+    }
   };
 
   return (

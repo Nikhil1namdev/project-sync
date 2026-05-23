@@ -27,7 +27,7 @@ const ListFeature = () => {
 
   const fetchData = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/List/getList');
+      const response = await axios.get('http://localhost:8000/List/getList');
       setRows(response.data.reverse());
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -37,7 +37,7 @@ const ListFeature = () => {
   const handlePost = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:5000/List/NewList', newRow);
+      const response = await axios.post('http://localhost:8000/List/NewList', newRow);
 
       // Optimistically update UI
       setRows((prevRows) => [response.data, ...prevRows]);

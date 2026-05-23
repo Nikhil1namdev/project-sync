@@ -30,7 +30,7 @@ function App() {
         <Route path='/' element={<Home/>}/>
         <Route path='/Login' element={<LoginOne/>}/>
         <Route path='/Signup' element={<Signup/>}/>
-        <Route path="/PricingPage" element={<PricingPage/>} />
+        <Route path="/pricing" element={<PricingPage/>} />
 
         <Route element={<ProtectedRoute/>}>   
         <Route path="/JiraDashboard" element={<JiraDashboard/>} />
@@ -42,6 +42,7 @@ function App() {
               <Route path='/User/ListFeature' element={<ListFeature/>}/>
       
         </Route>
+        <Route path="*" element={<div className="flex h-screen items-center justify-center text-3xl font-bold dark:text-white dark:bg-gray-900 w-full">404 - Page Coming Soon</div>} />
         </Routes>
      
     </Router>
