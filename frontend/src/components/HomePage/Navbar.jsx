@@ -57,7 +57,7 @@ const Navbar = () => {
         </button>
 
         {/* Menu Items */}
-        <div className={`${menuOpen ? "block" : "hidden"} w-full md:block md:w-auto`}>
+        <div className={`${menuOpen ? "block" : "hidden"} w-full md:flex md:w-auto md:items-center`}>
           <ul className="flex flex-col md:flex-row font-medium p-4 md:p-0 mt-4 border rounded-lg md:space-x-8 md:mt-0 md:border-0 bg-gray-50 md:bg-white dark:bg-gray-800 md:dark:bg-gray-900 dark:border-gray-700">
             <li>
               <Link
@@ -89,6 +89,10 @@ const Navbar = () => {
               </Link>
             </li>
           </ul>
+          <div className="flex flex-col md:flex-row md:ml-8 mt-4 md:mt-0 space-y-2 md:space-y-0 md:space-x-2 p-4 md:p-0">
+            <Link to="/Login" className="text-gray-900 hover:text-blue-700 font-medium rounded-lg text-sm px-4 py-2 text-center dark:text-white">Log in</Link>
+            <Link to="/Signup" className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Sign up</Link>
+          </div>
         </div>
       </div>
     </nav>
