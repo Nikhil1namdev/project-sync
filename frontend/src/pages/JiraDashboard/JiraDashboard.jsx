@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
@@ -18,7 +19,9 @@ import {
   CheckCircle2, 
   User2, 
   ArrowRight,
-  HelpCircle
+  HelpCircle,
+  LogOut,
+  ChevronUp
 } from 'lucide-react';
 import ToDolist from '../../features/ToDolist';
 import Jira from './Jira';
@@ -28,9 +31,45 @@ import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
 import { showToast } from '../../utils/toast';
 
 export default function JiraDashboard() {
-  const { User } = useContext(LoginContext);
+  const { User, setLogin, setUser, setToken } = useContext(LoginContext);
   const [activeTab, setActiveTab] = useState('Summary');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const navigate = useNavigate();
+
+  // Secure Logout action clearing local state and route cache
+  const handleLogout = () => {
+    localStorage.removeItem('userInfo');
+    setLogin(false);
+    setUser(null);
+    setToken(null);
+    showToast.success("Logged out successfully. See you soon!");
+    navigate('/Login', { replace: true });
+  };
+
+  // Load authenticated user profile details from localStorage
+  const userProfile = (() => {
+    const info = localStorage.getItem('userInfo');
+    if (info) {
+      try {
+        return JSON.parse(info);
+      } catch (e) {
+        console.error("Error loading user profile details inside JiraDashboard:", e);
+      }
+    }
+    return null;
+  })();
+
+  const userName = userProfile?.name || User || 'User';
+
+  const getInitials = (fullName) => {
+    if (!fullName) return 'U';
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   // Primary sidebar selections mapped to their respective content tabs
   const sidebarLinks = [
@@ -81,15 +120,67 @@ export default function JiraDashboard() {
             </span>
           </div>
 
-          {/* User profile identifier */}
-          <div className="flex items-center space-x-3 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold text-xs border border-blue-200/30">
-              {User ? User.substring(0, 2).toUpperCase() : 'PS'}
+          {/* User profile identifier with Dropdown Trigger */}
+          <div className="relative">
+            <div 
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="flex items-center justify-between bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 cursor-pointer select-none hover:bg-slate-100/50 transition duration-150"
+            >
+              <div className="flex items-center space-x-3 overflow-hidden">
+                {userProfile?.profilepic && !imgError ? (
+                  <img 
+                    src={userProfile.profilepic} 
+                    alt={userName} 
+                    className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                    referrerPolicy="no-referrer" // Bypass Google media server 403 blocks
+                    onError={() => setImgError(true)} // Safely unmount on error
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold text-xs border border-blue-200/30 shrink-0">
+                    {getInitials(userName)}
+                  </div>
+                )}
+                <div className="overflow-hidden text-left">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active User</div>
+                  <div className="text-xs font-bold text-slate-700 truncate max-w-[100px]">{userName}</div>
+                </div>
+              </div>
+              <ChevronUp className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`} />
             </div>
-            <div className="overflow-hidden">
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active User</div>
-              <div className="text-xs font-bold text-slate-700 truncate max-w-[140px]">{User || 'Guest Developer'}</div>
-            </div>
+
+            {/* Premium Profile Actions Overlay */}
+            {showProfileMenu && (
+              <div className="absolute bottom-16 left-0 right-0 bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xl rounded-2xl p-2 z-50 select-none">
+                <div className="px-2 py-1.5 border-b border-slate-100 mb-2">
+                  <div className="font-bold text-slate-800 text-[12px] truncate">{userName}</div>
+                  <div className="text-[9px] text-slate-400 font-semibold truncate">{userProfile?.email || 'Developer Member'}</div>
+                </div>
+                <button 
+                  onClick={() => { setShowProfileMenu(false); navigate('/UserDashboard'); }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.75 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-blue-50/50 hover:text-blue-600 transition text-left cursor-pointer"
+                >
+                  <LayoutDashboard className="w-3.5 h-3.5 text-slate-500" />
+                  <span>User Dashboard</span>
+                </button>
+                <button 
+                  onClick={() => { setShowProfileMenu(false); navigate('/pricing'); }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.75 rounded-lg text-[11px] font-bold text-slate-600 hover:bg-blue-50/50 hover:text-blue-600 transition text-left cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Account Settings</span>
+                </button>
+                
+                <div className="h-px bg-slate-100 my-1.5" />
+                
+                <button 
+                  onClick={() => { setShowProfileMenu(false); setShowLogoutModal(true); }}
+                  className="w-full flex items-center space-x-2 px-2.5 py-1.75 rounded-lg text-[11px] font-bold text-red-600 hover:bg-red-50 transition text-left cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Log out</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Nav List */}
@@ -469,6 +560,67 @@ export default function JiraDashboard() {
           </button>
         </div>
       </aside>
+
+      {/* Premium Atlassian-Style Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 max-w-sm w-full p-6 shadow-2xl relative select-none animate-in fade-in zoom-in-95 duration-200">
+            {/* Branding Header */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 text-white font-black text-sm mb-4 shadow-md shadow-blue-500/20">
+                P
+              </div>
+              <h3 className="text-sm font-bold text-slate-800 tracking-tight text-center">
+                Log out of your Project-<span className="text-blue-600">Sync</span> account
+              </h3>
+            </div>
+
+            {/* User Details Account Card */}
+            <div className="flex items-center space-x-4 p-4 rounded-xl bg-slate-50 border border-slate-100 mb-6">
+              {userProfile?.profilepic && !imgError ? (
+                <img 
+                  src={userProfile.profilepic} 
+                  alt={userName} 
+                  className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
+                  referrerPolicy="no-referrer"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-sm shadow-blue-500/10 shrink-0">
+                  {getInitials(userName)}
+                </div>
+              )}
+              <div className="overflow-hidden text-left">
+                <div className="font-bold text-slate-800 text-[14px] truncate">{userName}</div>
+                <div className="text-[11px] text-slate-400 font-semibold truncate">{userProfile?.email || 'Developer Member'}</div>
+              </div>
+            </div>
+
+            {/* Confirmation Actions */}
+            <div className="space-y-2.5">
+              <button 
+                onClick={() => { setShowLogoutModal(false); handleLogout(); }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-500/10 cursor-pointer"
+              >
+                Log out
+              </button>
+              <button 
+                onClick={() => setShowLogoutModal(false)}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+
+            {/* Footnote */}
+            <div className="mt-6 border-t border-slate-100 pt-4 text-center">
+              <div className="text-[10px] text-slate-400 font-semibold">
+                One account for all your synchronized workspaces.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

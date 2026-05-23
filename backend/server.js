@@ -1,5 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
+// Trigger Nodemon reload to sync new sandbox error handling pipeline
 import dotenv from "dotenv";
 import cors from "cors";
 import http from "http";                    // <-- for creating server
@@ -7,6 +8,8 @@ import { Server } from "socket.io";         // <-- for socket.io
 import ConnectDB from "./config/ConnectDB.js";
 import ListFeatureRoutes from './Routes/ListFeatureRoutes.js';
 import AuthRoutes from './Routes/AuthRoutes.js';
+import ProjectRoutes from './Routes/ProjectRoutes.js';
+import TaskRoutes from './Routes/TaskRoutes.js';
 import { saveMessage } from "./controller/messageControllerss.js";
 import MessageRoutes from './Routes/MessageRoutes.js';
 dotenv.config();
@@ -19,6 +22,8 @@ app.use(cors());
 // ROUTES
 app.use("/List", ListFeatureRoutes);
 app.use("/auth", AuthRoutes);
+app.use("/api/projects", ProjectRoutes);
+app.use("/api/tasks", TaskRoutes);
 app.use("/messages", MessageRoutes);
 
 app.get("/", (req, res) => {
