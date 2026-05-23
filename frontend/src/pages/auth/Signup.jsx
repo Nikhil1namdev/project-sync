@@ -15,6 +15,13 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Auto-redirect if already logged in to prevent back-navigation to signup page
+  React.useEffect(() => {
+    if (localStorage.getItem('userInfo')) {
+      navigate('/JiraDashboard');
+    }
+  }, [navigate]);
+
   const handleChange = (e) => {
     setFormData(prev => ({
       ...prev,

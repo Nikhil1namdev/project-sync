@@ -13,6 +13,14 @@ const LoginOne = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Auto-redirect if already logged in to prevent back-navigation to login page
+  React.useEffect(() => {
+    if (localStorage.getItem('userInfo')) {
+      navigate('/JiraDashboard');
+    }
+  }, [navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -83,7 +91,7 @@ const LoginOne = () => {
       {/* LEFT SIDE: SaaS Branding & Benefits Panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-700 via-indigo-800 to-slate-950 p-12 text-white flex-col justify-between relative overflow-hidden">
         {/* Glow circles */}
-        <div className="absolute top-0 left-0 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 left-0 w-80 h-80 bg-blue-50/20 rounded-full blur-3xl"></div>
         <div className="absolute bottom-0 right-0 w-80 h-80 bg-indigo-500/20 rounded-full blur-3xl"></div>
         
         {/* Top brand */}
@@ -129,8 +137,9 @@ const LoginOne = () => {
         </div>
       </div>
 
-      {/* RIGHT SIDE: Interactive Login Card */}
+      {/* RIGHT SIDE: Interactive Auth Panel */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12">
+        
         <div className="w-full max-w-md space-y-8">
           
           {/* Form Header */}
@@ -190,11 +199,28 @@ const LoginOne = () => {
               </div>
             </div>
 
+            {/* Premium "Remember me" Checkbox */}
+            <div className="flex items-center space-x-2.5">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4.5 w-4.5 text-blue-600 focus:ring-blue-500 border-slate-300 rounded cursor-pointer transition duration-150"
+              />
+              <label 
+                htmlFor="rememberMe" 
+                className="text-[12px] font-bold text-slate-500 dark:text-slate-400 select-none cursor-pointer hover:text-slate-700 dark:hover:text-slate-300"
+              >
+                Remember me
+              </label>
+            </div>
+
             {/* Login Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold tracking-wide shadow-lg shadow-blue-500/10 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150 disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold tracking-wide shadow-lg shadow-blue-500/10 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150 disabled:opacity-50 flex items-center justify-center space-x-2 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -221,7 +247,7 @@ const LoginOne = () => {
               type="button"
               disabled={loading}
               onClick={() => GoogleLogin()}
-              className="w-full flex items-center justify-center space-x-3 border border-slate-200 bg-white py-3 rounded-xl hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-200 transition disabled:opacity-50"
+              className="w-full flex items-center justify-center space-x-3 border border-slate-200 bg-white py-3 rounded-xl hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 font-semibold text-slate-700 dark:text-slate-200 transition disabled:opacity-50 cursor-pointer"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -233,17 +259,22 @@ const LoginOne = () => {
             </button>
           </form>
 
-          {/* Direct Link to Sign Up */}
-          <div className="text-center pt-2">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              New to Project-Sync?{" "}
-              <Link to="/Signup" className="text-blue-600 hover:underline font-bold dark:text-blue-400">
-                Create an account
-              </Link>
-            </p>
+          {/* Direct Links to Recovery & Sign Up (Atlassian Style footer) */}
+          <div className="text-center pt-2 flex flex-col sm:flex-row items-center justify-center sm:space-x-4 space-y-2 sm:space-y-0 text-sm text-slate-500 dark:text-slate-400 select-none">
+            <Link 
+              to="/forgot-password"
+              className="text-blue-600 hover:underline font-bold dark:text-blue-400 cursor-pointer"
+            >
+              Can't log in?
+            </Link>
+            <span className="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
+            <Link to="/Signup" className="text-blue-600 hover:underline font-bold dark:text-blue-400">
+              Create an account
+            </Link>
           </div>
 
         </div>
+
       </div>
 
     </div>

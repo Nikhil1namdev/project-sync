@@ -16,8 +16,13 @@ const GoogleAuth =async(req,res,next)=>{
             user = await User.create({
                 name,
                 email,
-                image: picture,
+                profilepic: picture,
             });
+        } else if (picture) {
+            if (user.profilepic !== picture) {
+                user.profilepic = picture;
+                await user.save();
+            }
         }
         const { _id } = user;
         const token = jwt.sign({ _id, email },

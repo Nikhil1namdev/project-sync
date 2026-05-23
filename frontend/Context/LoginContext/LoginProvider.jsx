@@ -8,17 +8,36 @@ import CreateLoginContext from './CreateLoginContext.js';
  * login flags, and JWT authorization tokens using the `useContext` hook.
  */
 const LoginProvider = ({ children }) => {
-  // Global React States for dynamic UI updates across components
-  const [User, setUser] = useState(null);       // Active user's name
-  const [login, setLogin] = useState(false);    // Authentication status boolean flag
-  const [token, setToken] = useState(null);    // Signed JWT authorization token
+  // Rehydrate login states dynamically from localStorage to prevent loss of state on refresh
+  const [User, setUser] = useState(() => {
+    const info = localStorage.getItem('userInfo');
+    if (info) {
+      try {
+        const parsed = JSON.parse(info);
+        return parsed.name;
+      } catch (e) {
+        console.error("Error parsing user info in provider state initialization:", e);
+      }
+    }
+    return null;
+  });
 
-  // ⬇️ Rehydrate login state from localStorage (commented out in current project structure)
-  useEffect(() => {
-    // If enabled, this acts as a dynamic browser session rehydrator.
-    // It checks if local storage contains a valid user token, then populates state
-    // so the user remains authenticated on page refresh instead of logging out.
-  }, []);
+  const [login, setLogin] = useState(() => {
+    return localStorage.getItem('userInfo') ? true : false;
+  });
+
+  const [token, setToken] = useState(() => {
+    const info = localStorage.getItem('userInfo');
+    if (info) {
+      try {
+        const parsed = JSON.parse(info);
+        return parsed.token;
+      } catch (e) {
+        console.error("Error parsing user token in provider state initialization:", e);
+      }
+    }
+    return null;
+  });
 
   return (
     // Broadcast context variables and updates triggers to all nested consumer elements
