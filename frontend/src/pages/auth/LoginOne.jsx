@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { Link, useNavigate } from 'react-router-dom';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext.js';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient.js';
 import { showToast } from '../../utils/toast.js';
 
 const LoginOne = () => {
@@ -26,7 +26,7 @@ const LoginOne = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:8000/auth/Login', { email, password });
+      const response = await apiClient.post('/auth/Login', { email, password });
       const { name, email: userEmail, profilepic } = response.data.user;
       const token = response.data.token;
       const obj = { email: userEmail, name, token, profilepic };
@@ -54,7 +54,7 @@ const LoginOne = () => {
     setLoading(true);
     try {
       if (authResult["code"]) {
-        const response = await axios.get(`http://localhost:8000/auth/google-auth?code=${authResult.code}`);
+        const response = await apiClient.get(`/auth/google-auth?code=${authResult.code}`);
         const { name, email: userEmail, profilepic } = response.data.user;
         const token = response.data.token;
         const obj = { email: userEmail, name, token, profilepic };

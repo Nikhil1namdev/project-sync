@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient.js';
 import { showToast } from '../../utils/toast.js';
 
 const ResetPassword = () => {
@@ -36,7 +36,7 @@ const ResetPassword = () => {
     setLoading(true);
     try {
       // API call validating token and updating credentials in MongoDB
-      const response = await axios.post('http://localhost:8000/auth/reset-password', {
+      const response = await apiClient.post('/auth/reset-password', {
         token,
         newPassword: password
       });

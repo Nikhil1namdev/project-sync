@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient';
 import { 
   Settings, 
   FolderKanban, 
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
 import { showToast } from '../../utils/toast';
+import NotificationBell from '../../components/NotificationBell/NotificationBell';
 
 const ProjectDetails = () => {
   const { id: projectId } = useParams();
@@ -49,6 +50,15 @@ const ProjectDetails = () => {
   // Active Task Filter States
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+
+  // Kanban & Drag-Drop States
+  const [viewMode, setViewMode] = useState('kanban'); // default to kanban board
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [dragOverColumn, setDragOverColumn] = useState(null);
+
+  // Activity Timeline States
+  const [activities, setActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
 
   // Delete Task States
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -89,14 +99,56 @@ const ProjectDetails = () => {
     });
   };
 
+  // Relative time formatter
+  const getRelativeTime = (dateString) => {
+    if (!dateString) return 'Just now';
+    const now = new Date();
+    const past = new Date(dateString);
+    const diffMs = now - past;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffSec < 60) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    if (diffDay === 1) return 'Yesterday';
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Due status helper
+  const getTaskDueStatus = (task) => {
+    if (!task || !task.dueDate || task.status === 'completed') {
+      return 'normal';
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dueDateObj = new Date(task.dueDate);
+    dueDateObj.setHours(0, 0, 0, 0);
+
+    if (dueDateObj < today) {
+      return 'overdue';
+    }
+
+    const twoDaysLater = new Date(today);
+    twoDaysLater.setDate(today.getDate() + 2);
+
+    if (dueDateObj >= today && dueDateObj <= twoDaysLater) {
+      return 'due-soon';
+    }
+
+    return 'normal';
+  };
+
   // FETCH PROJECT DATA BY ID
   const fetchProjectDetails = async () => {
     if (!token) return;
     setProjectLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8000/api/projects/${projectId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await apiClient.get(`/api/projects/${projectId}`);
       setProject(response.data.project);
     } catch (error) {
       console.error("Fetch Project Details Error:", error);
@@ -112,10 +164,9 @@ const ProjectDetails = () => {
     if (!token) return;
     setTasksLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8000/api/tasks/project/${projectId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await apiClient.get(`/api/tasks/project/${projectId}`);
       setTasks(response.data.tasks || []);
+      fetchActivities(); // Automatically sync activity logs
     } catch (error) {
       console.error("Fetch Tasks Error:", error);
       showToast.error("Failed to load tasks list.");
@@ -124,10 +175,25 @@ const ProjectDetails = () => {
     }
   };
 
+  // FETCH ACTIVITIES FOR THIS PROJECT
+  const fetchActivities = async () => {
+    if (!token) return;
+    setActivitiesLoading(true);
+    try {
+      const response = await apiClient.get(`/api/activity/project/${projectId}`);
+      setActivities(response.data.activities || []);
+    } catch (error) {
+      console.error("Fetch Activities Error:", error);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (token) {
       fetchProjectDetails();
       fetchTasks();
+      fetchActivities();
     } else {
       navigate('/Login');
     }
@@ -138,6 +204,10 @@ const ProjectDetails = () => {
   const completedTasksCount = tasks.filter(t => t.status === 'completed').length;
   const pendingTasksCount = totalTasksCount - completedTasksCount;
   const completionPercentage = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
+
+  // Due status counts
+  const overdueCount = tasks.filter(t => getTaskDueStatus(t) === 'overdue').length;
+  const dueSoonCount = tasks.filter(t => getTaskDueStatus(t) === 'due-soon').length;
 
   // Dynamic filtering of tasks list using useMemo
   const filteredTasks = useMemo(() => {
@@ -153,6 +223,19 @@ const ProjectDetails = () => {
   const inProgressCount = tasks.filter(t => t.status === 'in-progress').length;
   const completedCount = tasks.filter(t => t.status === 'completed').length;
   const totalCount = tasks.length;
+
+  // Kanban Column Lists (filtered by active priority Filter)
+  const kanbanTodoTasks = useMemo(() => {
+    return tasks.filter(t => t.status === 'todo' && (priorityFilter === 'all' || t.priority === priorityFilter));
+  }, [tasks, priorityFilter]);
+
+  const kanbanInProgressTasks = useMemo(() => {
+    return tasks.filter(t => t.status === 'in-progress' && (priorityFilter === 'all' || t.priority === priorityFilter));
+  }, [tasks, priorityFilter]);
+
+  const kanbanCompletedTasks = useMemo(() => {
+    return tasks.filter(t => t.status === 'completed' && (priorityFilter === 'all' || t.priority === priorityFilter));
+  }, [tasks, priorityFilter]);
 
   // Dynamic badge styling helper for premium progress stats
   const getProgressBadgeStyles = (percentage) => {
@@ -230,15 +313,11 @@ const ProjectDetails = () => {
 
       if (editingTask) {
         // PATCH Task
-        await axios.patch(`http://localhost:8000/api/tasks/${editingTask._id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await apiClient.patch(`/api/tasks/${editingTask._id}`, payload);
         showToast.success("Task updated successfully!");
       } else {
         // POST Task
-        await axios.post('http://localhost:8000/api/tasks', payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await apiClient.post('/api/tasks', payload);
         showToast.success("Task created successfully!");
       }
 
@@ -256,9 +335,7 @@ const ProjectDetails = () => {
   // QUICK UPDATE STATUS HANDLER
   const handleQuickStatusChange = async (task, newStatus) => {
     try {
-      await axios.patch(`http://localhost:8000/api/tasks/${task._id}`, { status: newStatus }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiClient.patch(`/api/tasks/${task._id}`, { status: newStatus });
       showToast.success(`Task moved to ${newStatus}`);
       fetchTasks();
     } catch (error) {
@@ -278,9 +355,7 @@ const ProjectDetails = () => {
     if (!taskToDelete) return;
     setDeleteSubmitting(true);
     try {
-      await axios.delete(`http://localhost:8000/api/tasks/${taskToDelete._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiClient.delete(`/api/tasks/${taskToDelete._id}`);
       showToast.success("Task successfully removed.");
       setShowDeleteModal(false);
       fetchTasks(); // Reload
@@ -291,6 +366,197 @@ const ProjectDetails = () => {
       setDeleteSubmitting(false);
       setTaskToDelete(null);
     }
+  };
+
+  // ==========================================
+  // NATIVE DRAG & DROP HANDLERS FOR KANBAN
+  // ==========================================
+  const handleDragStart = (e, task) => {
+    e.dataTransfer.setData("text/plain", task._id);
+    setDraggedTaskId(task._id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+    setDragOverColumn(null);
+  };
+
+  const handleDragOver = (e, columnId) => {
+    e.preventDefault();
+    if (dragOverColumn !== columnId) {
+      setDragOverColumn(columnId);
+    }
+  };
+
+  const handleDrop = async (e, columnId) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData("text/plain") || draggedTaskId;
+    setDragOverColumn(null);
+    setDraggedTaskId(null);
+
+    if (!taskId) return;
+
+    const targetTask = tasks.find(t => t._id === taskId);
+    if (!targetTask || targetTask.status === columnId) return;
+
+    // Optimistic UI Update
+    const originalTasks = [...tasks];
+    const updatedTasks = tasks.map(t => 
+      t._id === taskId ? { ...t, status: columnId } : t
+    );
+    setTasks(updatedTasks);
+
+    try {
+      await apiClient.patch(`/api/tasks/${taskId}`, { status: columnId });
+      showToast.success(`Task moved to ${columnId === 'in-progress' ? 'In Progress' : columnId === 'todo' ? 'Todo' : 'Completed'}`);
+      fetchActivities(); // Refresh activity log after drop
+    } catch (error) {
+      console.error("Failed to move task:", error);
+      showToast.error("Failed to save task status change.");
+      setTasks(originalTasks); // Rollback
+    }
+  };
+
+  const renderKanbanTaskCard = (task) => {
+    const isCurrentlyDragged = draggedTaskId === task._id;
+    
+    const priorityStyles = {
+      low: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800",
+      medium: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-955/20 dark:text-amber-400 dark:border-amber-900/30",
+      high: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-955/20 dark:text-rose-400 dark:border-rose-900/30"
+    };
+
+    const dueStatus = getTaskDueStatus(task);
+    const borderGlowClass = 
+      dueStatus === 'overdue' 
+        ? "border-rose-500/60 dark:border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.15)] dark:shadow-[0_0_12px_rgba(244,63,94,0.1)]" 
+        : dueStatus === 'due-soon'
+          ? "border-amber-500/40 dark:border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.08)]"
+          : "border-slate-200/60 dark:border-slate-800/80";
+
+    const dateColorClass = 
+      dueStatus === 'overdue' 
+        ? "text-rose-500 dark:text-rose-400 font-extrabold" 
+        : dueStatus === 'due-soon'
+          ? "text-amber-500 dark:text-amber-400 font-extrabold"
+          : "text-slate-400 dark:text-slate-500 font-semibold";
+
+    return (
+      <div
+        key={task._id}
+        draggable="true"
+        onDragStart={(e) => handleDragStart(e, task)}
+        onDragEnd={handleDragEnd}
+        className={`bg-white dark:bg-slate-900 border ${borderGlowClass} rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 hover:border-blue-500/50 dark:hover:border-blue-500/50 cursor-grab active:cursor-grabbing select-none relative group ${
+          isCurrentlyDragged ? "opacity-35 scale-95 border-dashed border-blue-500" : ""
+        }`}
+      >
+        {/* Priority Badge & Actions */}
+        <div className="flex justify-between items-start mb-2.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded border uppercase ${priorityStyles[task.priority || 'medium']}`}>
+              {task.priority}
+            </span>
+            {dueStatus === 'overdue' && (
+              <span className="bg-rose-500 text-white dark:bg-rose-955/40 dark:text-rose-400 border border-rose-600/20 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded select-none animate-pulse">
+                Overdue
+              </span>
+            )}
+            {dueStatus === 'due-soon' && (
+              <span className="bg-amber-500 text-white dark:bg-amber-955/40 dark:text-amber-400 border border-amber-600/20 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded select-none">
+                Due Soon
+              </span>
+            )}
+          </div>
+          
+          <div className="flex space-x-1 shrink-0">
+            <button
+              onClick={() => handleOpenEditModal(task)}
+              className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-blue-600 transition cursor-pointer"
+              title="Edit Task"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => handleTriggerDelete(task)}
+              className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-400 hover:text-red-600 transition cursor-pointer"
+              title="Delete Task"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Task Title */}
+        <h5 className="font-extrabold text-slate-800 dark:text-white text-sm leading-snug mb-1 line-clamp-1">
+          {task.title}
+        </h5>
+
+        {/* Task Description */}
+        <p className="text-[11px] text-slate-500 dark:text-slate-450 line-clamp-2 leading-relaxed mb-4">
+          {task.description ? task.description : <span className="italic text-slate-350 dark:text-slate-655 font-medium">No details provided.</span>}
+        </p>
+
+        {/* Due Date Footer */}
+        <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-800 pt-3 text-[10px]">
+          <span className={`${dateColorClass} flex items-center space-x-1`}>
+            <Calendar className="w-3 h-3" />
+            <span>Due: {formatDate(task.dueDate)}</span>
+          </span>
+
+          <span className={`text-[8px] font-black uppercase px-2 py-0.25 rounded border shrink-0 ${
+            task.status === 'completed' 
+              ? "bg-green-50/50 text-green-600 border-green-200/50 dark:bg-green-955/10 dark:text-green-400" 
+              : task.status === 'in-progress' 
+              ? "bg-blue-50/50 text-blue-600 border-blue-200/50 dark:bg-blue-955/10 dark:text-blue-400" 
+              : "bg-slate-100/50 text-slate-500 border-slate-200/50 dark:bg-slate-800/10 dark:text-slate-400"
+          }`}>
+            {task.status === 'in-progress' ? 'In Progress' : task.status}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderKanbanColumn = (columnId, title, columnTasks, columnBgClass, titleBadgeClass) => {
+    const isOver = dragOverColumn === columnId;
+    return (
+      <div 
+        onDragOver={(e) => handleDragOver(e, columnId)}
+        onDragLeave={() => setDragOverColumn(null)}
+        onDrop={(e) => handleDrop(e, columnId)}
+        className={`flex flex-col rounded-2xl p-4 border transition-all duration-300 min-h-[480px] ${columnBgClass} ${
+          isOver 
+            ? "ring-2 ring-blue-500/50 border-blue-500/50 bg-blue-50/5 dark:bg-blue-955/5 scale-[1.01]" 
+            : ""
+        }`}
+      >
+        {/* Column Title Header */}
+        <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-200/30 dark:border-slate-800/60">
+          <div className="flex items-center space-x-2">
+            <span className={`w-2 h-2 rounded-full ${
+              columnId === 'todo' ? 'bg-slate-400' : columnId === 'in-progress' ? 'bg-amber-500' : 'bg-green-500'
+            }`} />
+            <h4 className="font-extrabold text-slate-850 dark:text-slate-200 text-sm tracking-tight capitalize">{title}</h4>
+          </div>
+          <span className={`px-2 py-0.5 rounded text-[10px] font-black tracking-wide ${titleBadgeClass}`}>
+            {columnTasks.length}
+          </span>
+        </div>
+
+        {/* Column Scrollable Tasks Container */}
+        <div className="flex-1 overflow-y-auto space-y-3.5 pr-1 max-h-[500px] scrollbar-thin">
+          {columnTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200/40 dark:border-slate-800/50 rounded-xl py-12 text-center select-none bg-slate-50/20 dark:bg-slate-900/10">
+              <span className="text-xl mb-1.5 opacity-60">📥</span>
+              <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">Empty Column</p>
+            </div>
+          ) : (
+            columnTasks.map(task => renderKanbanTaskCard(task))
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -374,14 +640,18 @@ const ProjectDetails = () => {
       {/* Main Board Content */}
       <div className="flex-1 overflow-y-auto p-8 sm:p-12">
         
-        {/* Back navigation */}
-        <button
-          onClick={() => navigate('/UserDashboard')}
-          className="mb-6 flex items-center space-x-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Dashboard</span>
-        </button>
+        {/* Back navigation and notifications */}
+        <div className="flex justify-between items-center mb-6">
+          <button
+            onClick={() => navigate('/UserDashboard')}
+            className="flex items-center space-x-2 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer select-none"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Dashboard</span>
+          </button>
+          
+          <NotificationBell />
+        </div>
 
         {/* PROJECT META HERO CARD */}
         {projectLoading ? (
@@ -454,78 +724,132 @@ const ProjectDetails = () => {
                 />
               </div>
             </div>
+
+            {/* Task due status indicators */}
+            {(overdueCount > 0 || dueSoonCount > 0) && (
+              <div className="flex flex-wrap gap-2.5 mt-4 pt-1.5 select-none">
+                {overdueCount > 0 && (
+                  <div className="flex items-center space-x-1.5 bg-rose-50/50 dark:bg-rose-955/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-950/40 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping absolute"></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 relative"></span>
+                    <span>{overdueCount} Overdue {overdueCount === 1 ? 'Task' : 'Tasks'}</span>
+                  </div>
+                )}
+                {dueSoonCount > 0 && (
+                  <div className="flex items-center space-x-1.5 bg-amber-50/50 dark:bg-amber-955/20 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-950/40 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    <span>{dueSoonCount} Due Soon</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {/* TASKS DETAILS GRID */}
-        <div>
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200/60 dark:border-slate-800 mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Active Tasks Sprint</h3>
+        {/* TASKS DETAILS GRID AND TIMELINE WRAPPER */}
+        <div className="flex flex-col xl:flex-row gap-8 items-start w-full">
+          
+          {/* SPRINT WORKSPACE */}
+          <div className="flex-1 w-full min-w-0">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200/60 dark:border-slate-800 mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Active Tasks Sprint</h3>
               <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
                 Manage and track individual workspace tasks
               </p>
             </div>
             
             {/* Dynamic Filter Navigation Tabs & Live Counts */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer select-none ${
-                  statusFilter === 'all'
-                    ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/10'
-                    : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                <span>All</span>
-                <span className={`px-1.5 py-0.25 rounded text-[9px] font-black ${statusFilter === 'all' ? 'bg-blue-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                  {totalCount}
-                </span>
-              </button>
-              
-              <button
-                onClick={() => setStatusFilter('todo')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer select-none ${
-                  statusFilter === 'todo'
-                    ? 'bg-slate-600 dark:bg-slate-800 border-slate-600 dark:border-slate-700 text-white shadow-md shadow-slate-500/10'
-                    : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                <span>Todo</span>
-                <span className={`px-1.5 py-0.25 rounded text-[9px] font-black ${statusFilter === 'todo' ? 'bg-slate-700 dark:bg-slate-900 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                  {todoCount}
-                </span>
-              </button>
-              
-              <button
-                onClick={() => setStatusFilter('in-progress')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer select-none ${
-                  statusFilter === 'in-progress'
-                    ? 'bg-amber-600 border-amber-600 text-white shadow-md shadow-amber-500/10'
-                    : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                <span>In Progress</span>
-                <span className={`px-1.5 py-0.25 rounded text-[9px] font-black ${statusFilter === 'in-progress' ? 'bg-amber-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                  {inProgressCount}
-                </span>
-              </button>
-              
-              <button
-                onClick={() => setStatusFilter('completed')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer select-none ${
-                  statusFilter === 'completed'
-                    ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-500/10'
-                    : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                <span>Completed</span>
-                <span className={`px-1.5 py-0.25 rounded text-[9px] font-black ${statusFilter === 'completed' ? 'bg-green-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
-                  {completedCount}
-                </span>
-              </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* View Mode Toggle: Kanban Board vs List View */}
+              <div className="flex items-center bg-slate-100 dark:bg-slate-800/40 p-1 rounded-xl border border-slate-200/50 dark:border-slate-800 shrink-0 mr-1.5">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('kanban')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 flex items-center space-x-1.5 cursor-pointer ${
+                    viewMode === 'kanban'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/30 dark:border-slate-800/50'
+                      : 'text-slate-555 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <FolderKanban className="w-3.5 h-3.5" />
+                  <span>Kanban Board</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 flex items-center space-x-1.5 cursor-pointer ${
+                    viewMode === 'list'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/30 dark:border-slate-800/50'
+                      : 'text-slate-555 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>List View</span>
+                </button>
+              </div>
 
-              <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1 hidden sm:block" />
+              {viewMode === 'list' && (
+                <>
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer select-none ${
+                      statusFilter === 'all'
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/10'
+                        : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>All</span>
+                    <span className={`px-1.5 py-0.25 rounded text-[9px] font-black ${statusFilter === 'all' ? 'bg-blue-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                      {totalCount}
+                    </span>
+                  </button>
+                  
+                  <button
+                    onClick={() => setStatusFilter('todo')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer select-none ${
+                      statusFilter === 'todo'
+                        ? 'bg-slate-600 dark:bg-slate-800 border-slate-600 dark:border-slate-700 text-white shadow-md shadow-slate-500/10'
+                        : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>Todo</span>
+                    <span className={`px-1.5 py-0.25 rounded text-[9px] font-black ${statusFilter === 'todo' ? 'bg-slate-700 dark:bg-slate-900 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                      {todoCount}
+                    </span>
+                  </button>
+                  
+                  <button
+                    onClick={() => setStatusFilter('in-progress')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer select-none ${
+                      statusFilter === 'in-progress'
+                        ? 'bg-amber-600 border-amber-600 text-white shadow-md shadow-amber-500/10'
+                        : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>In Progress</span>
+                    <span className={`px-1.5 py-0.25 rounded text-[9px] font-black ${statusFilter === 'in-progress' ? 'bg-amber-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                      {inProgressCount}
+                    </span>
+                  </button>
+                  
+                  <button
+                    onClick={() => setStatusFilter('completed')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center space-x-1.5 border cursor-pointer select-none ${
+                      statusFilter === 'completed'
+                        ? 'bg-green-600 border-green-600 text-white shadow-md shadow-green-500/10'
+                        : 'bg-white dark:bg-slate-900 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>Completed</span>
+                    <span className={`px-1.5 py-0.25 rounded text-[9px] font-black ${statusFilter === 'completed' ? 'bg-green-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}`}>
+                      {completedCount}
+                    </span>
+                  </button>
+
+                  <div className="w-px h-6 bg-slate-200 dark:bg-slate-800 mx-1 hidden sm:block" />
+                </>
+              )}
 
               {/* Dynamic Priority Filter Dropdown */}
               <select
@@ -543,13 +867,16 @@ const ProjectDetails = () => {
 
           {tasksLoading ? (
             /* Loading task shimmers */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[1, 2].map((n) => (
-                <div key={n} className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-xl p-5 space-y-3 animate-pulse">
-                  <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/3"></div>
-                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-2/3"></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((n) => (
+                <div key={n} className="bg-white dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800 rounded-2xl p-5 space-y-4 animate-pulse">
+                  <div className="flex justify-between">
+                    <div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/3"></div>
+                    <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/4"></div>
+                  </div>
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-3/4 animate-pulse"></div>
                   <div className="h-px bg-slate-100 dark:bg-slate-800 pt-2"></div>
-                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/4"></div>
+                  <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/2"></div>
                 </div>
               ))}
             </div>
@@ -570,8 +897,15 @@ const ProjectDetails = () => {
                 Add first task
               </button>
             </div>
+          ) : viewMode === 'kanban' ? (
+            /* Kanban Board Column View */
+            <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 overflow-x-auto pb-4 select-none">
+              {renderKanbanColumn("todo", "Todo", kanbanTodoTasks, "bg-slate-100/30 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800/85", "text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800")}
+              {renderKanbanColumn("in-progress", "In Progress", kanbanInProgressTasks, "bg-amber-50/10 dark:bg-amber-955/5 border-amber-200/40 dark:border-amber-900/20", "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-955/20")}
+              {renderKanbanColumn("completed", "Completed", kanbanCompletedTasks, "bg-green-50/10 dark:bg-green-955/5 border-green-200/40 dark:border-green-900/20", "text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-955/20")}
+            </div>
           ) : filteredTasks.length === 0 ? (
-            /* Clean Empty state for filtered subset */
+            /* Clean Empty state for filtered subset (List View) */
             <div className="flex flex-col items-center justify-center text-center p-8 sm:p-10 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl py-14 max-w-md mx-auto shadow-sm select-none">
               <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-xl flex items-center justify-center mb-5">
                 <FileText className="w-6 h-6" />
@@ -582,7 +916,7 @@ const ProjectDetails = () => {
               </p>
             </div>
           ) : (
-            /* Grid display list */
+            /* List View Grid display list */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredTasks.map((task) => {
                 const priorityStyles = {
@@ -591,16 +925,25 @@ const ProjectDetails = () => {
                   high: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-955/20 dark:text-rose-400 dark:border-rose-900/30"
                 };
 
-                const statusStyles = {
-                  todo: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-800",
-                  "in-progress": "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-955/20 dark:text-blue-400 dark:border-blue-900/30",
-                  completed: "bg-green-50 text-green-700 border-green-200 dark:bg-green-955/20 dark:text-green-400 dark:border-green-900/30"
-                };
+                const dueStatus = getTaskDueStatus(task);
+                const borderGlowClass = 
+                  dueStatus === 'overdue' 
+                    ? "border-rose-500/60 dark:border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.15)] dark:shadow-[0_0_12px_rgba(244,63,94,0.1)]" 
+                    : dueStatus === 'due-soon'
+                      ? "border-amber-500/40 dark:border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.08)]"
+                      : "border-slate-200/60 dark:border-slate-800";
+
+                const dateColorClass = 
+                  dueStatus === 'overdue' 
+                    ? "text-rose-500 dark:text-rose-400 font-extrabold" 
+                    : dueStatus === 'due-soon'
+                      ? "text-amber-500 dark:text-amber-400 font-extrabold"
+                      : "text-slate-400 dark:text-slate-500 font-semibold";
 
                 return (
                   <div 
                     key={task._id} 
-                    className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between"
+                    className={`bg-white dark:bg-slate-900 border ${borderGlowClass} rounded-2xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between`}
                   >
                     <div>
                       {/* Top row */}
@@ -649,8 +992,18 @@ const ProjectDetails = () => {
                         <span className={`px-2 py-0.5 rounded border font-semibold ${priorityStyles[task.priority || 'medium']}`}>
                           {task.priority}
                         </span>
+                        {dueStatus === 'overdue' && (
+                          <span className="bg-rose-500 text-white dark:bg-rose-955/40 dark:text-rose-400 border border-rose-600/20 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded select-none animate-pulse">
+                            Overdue
+                          </span>
+                        )}
+                        {dueStatus === 'due-soon' && (
+                          <span className="bg-amber-500 text-white dark:bg-amber-955/40 dark:text-amber-400 border border-amber-600/20 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded select-none">
+                            Due Soon
+                          </span>
+                        )}
                         
-                        <span className="text-slate-400 dark:text-slate-500 font-semibold flex items-center space-x-1">
+                        <span className={`${dateColorClass} flex items-center space-x-1`}>
                           <Calendar className="w-3.5 h-3.5" />
                           <span>Due: {formatDate(task.dueDate)}</span>
                         </span>
@@ -667,7 +1020,7 @@ const ProjectDetails = () => {
                         </button>
                         <button
                           onClick={() => handleTriggerDelete(task)}
-                          className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-600 transition cursor-pointer"
+                          className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-955/20 text-slate-400 hover:text-red-600 transition cursor-pointer"
                           title="Delete Task"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -680,6 +1033,94 @@ const ProjectDetails = () => {
               })}
             </div>
           )}
+          </div> {/* End of SPRINT WORKSPACE */}
+
+          {/* RECENT ACTIVITY TIMELINE */}
+          <div className="w-full xl:w-80 shrink-0 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl p-5 shadow-sm self-start">
+            <h3 className="text-sm font-black text-slate-950 dark:text-white mb-4 tracking-tight flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-blue-500" />
+              <span>Sprint Activity Feed</span>
+            </h3>
+
+            {activitiesLoading ? (
+              <div className="space-y-4 py-2">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="flex space-x-3 items-start animate-pulse">
+                    <div className="w-5 h-5 bg-slate-100 dark:bg-slate-800 rounded-full shrink-0 mt-0.5"></div>
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-5/6"></div>
+                      <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded w-1/3"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : activities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-10 select-none bg-slate-50/20 dark:bg-slate-900/10 rounded-xl border border-dashed border-slate-200/40 dark:border-slate-850">
+                <span className="text-xl mb-1.5 opacity-60">🔔</span>
+                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">Empty Log</p>
+                <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 px-3 leading-normal">
+                  No activity actions recorded for this project yet.
+                </p>
+              </div>
+            ) : (
+              <div className="relative border-l border-slate-100 dark:border-slate-800/80 pl-4.5 space-y-5 ml-2.5 py-1">
+                {activities.map((item) => {
+                  // Determine icon mapping & background styles
+                  const iconConfig = {
+                    project_created: {
+                      icon: <Briefcase className="w-2.5 h-2.5" />,
+                      styles: "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-955/20 dark:text-blue-400 dark:border-blue-900/40"
+                    },
+                    project_updated: {
+                      icon: <Briefcase className="w-2.5 h-2.5" />,
+                      styles: "bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-955/20 dark:text-indigo-400 dark:border-indigo-900/40"
+                    },
+                    task_created: {
+                      icon: <Plus className="w-2.5 h-2.5" />,
+                      styles: "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-955/20 dark:text-emerald-400 dark:border-emerald-900/40"
+                    },
+                    task_updated: {
+                      icon: <Edit3 className="w-2.5 h-2.5" />,
+                      styles: "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-955/20 dark:text-amber-400 dark:border-amber-900/40"
+                    },
+                    task_deleted: {
+                      icon: <Trash2 className="w-2.5 h-2.5" />,
+                      styles: "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-955/20 dark:text-rose-400 dark:border-rose-900/40"
+                    },
+                    task_status_changed: {
+                      icon: <Layers className="w-2.5 h-2.5" />,
+                      styles: "bg-sky-50 text-sky-600 border-sky-200 dark:bg-sky-955/20 dark:text-sky-400 dark:border-sky-900/40"
+                    },
+                    task_completed: {
+                      icon: <CheckCircle className="w-2.5 h-2.5" />,
+                      styles: "bg-green-50 text-green-600 border-green-200 dark:bg-green-955/20 dark:text-green-400 dark:border-green-900/40"
+                    }
+                  };
+
+                  const currentStyle = iconConfig[item.type] || {
+                    icon: <Clock className="w-2.5 h-2.5" />,
+                    styles: "bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800"
+                  };
+
+                  return (
+                    <div key={item._id} className="relative pl-1.5 transition-all duration-300 hover:translate-x-0.5 select-none">
+                      {/* Floating Circle Anchor */}
+                      <span className={`absolute -left-[30px] top-0.5 w-5 h-5 rounded-full flex items-center justify-center border shadow-sm ${currentStyle.styles}`}>
+                        {currentStyle.icon}
+                      </span>
+                      <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-relaxed pr-1">
+                        {item.message}
+                      </p>
+                      <span className="text-[9px] font-semibold text-slate-400 dark:text-slate-500 mt-1 flex items-center space-x-1">
+                        <Clock className="w-2.5 h-2.5" />
+                        <span>{getRelativeTime(item.createdAt)}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
       </div>

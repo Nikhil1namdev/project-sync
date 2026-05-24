@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient.js';
 import { showToast } from '../../utils/toast.js';
 
 const ForgotPassword = () => {
@@ -13,7 +13,7 @@ const ForgotPassword = () => {
     setLoading(true);
     try {
       // Direct call to the backend real Resend email API
-      const response = await axios.post('http://localhost:8000/auth/forgot-password', { email });
+      const response = await apiClient.post('/auth/forgot-password', { email });
       showToast.success(response.data.message || "Recovery link sent! Please check your email inbox.");
       // Redirect back to login after short delay
       setTimeout(() => {

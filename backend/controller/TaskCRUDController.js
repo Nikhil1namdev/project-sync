@@ -1,5 +1,7 @@
 import TaskModel from "../Models/TaskModel.js";
 import ProjectModel from "../Models/ProjectModel.js";
+import { logActivity } from "../utils/activityLogger.js";
+import { logNotification } from "../utils/notificationLogger.js";
 
 // CREATE TASK
 // POST /api/tasks
@@ -30,10 +32,72 @@ const createTask = async (req, res) => {
       owner: req.user._id
     });
 
+    // Log activity on task creation
+    await logActivity({
+      type: "task_created",
+      message: `Task "${task.title}" was created.`,
+      projectId: projectId,
+      taskId: task._id,
+      ownerId: req.user._id
+    });
+
+    // Log Workspace Notification
+    await logNotification({
+      type: "task_created",
+      title: "New Task Created",
+      message: `Task "${task.title}" was created in this project.`,
+      userId: req.user._id,
+      projectId: projectId,
+      taskId: task._id
+    });
+
     return res.status(201).json({ message: "Task created successfully", task });
   } catch (error) {
     console.error("Create Task error:", error);
     return res.status(500).json({ message: "Server error while creating task." });
+  }
+};
+
+const analyzeDueDatesAndNotify = async (tasks, userId) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const task of tasks) {
+      if (!task.dueDate || task.status === 'completed') continue;
+
+      const dueDateObj = new Date(task.dueDate);
+      dueDateObj.setHours(0, 0, 0, 0);
+
+      if (dueDateObj < today) {
+        // Overdue task detected
+        await logNotification({
+          type: "overdue",
+          title: "Task Overdue Alert",
+          message: `Task "${task.title}" is overdue (was due on ${dueDateObj.toLocaleDateString()}).`,
+          userId,
+          projectId: task.project,
+          taskId: task._id
+        });
+      } else {
+        const twoDaysLater = new Date(today);
+        twoDaysLater.setDate(today.getDate() + 2);
+
+        if (dueDateObj >= today && dueDateObj <= twoDaysLater) {
+          // Due Soon task detected
+          await logNotification({
+            type: "due_soon",
+            title: "Task Due Soon Warning",
+            message: `Task "${task.title}" is due soon (due on ${dueDateObj.toLocaleDateString()}).`,
+            userId,
+            projectId: task.project,
+            taskId: task._id
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error analyzing task due dates:", err);
   }
 };
 
@@ -53,6 +117,12 @@ const getTasksByProject = async (req, res) => {
     }
 
     const tasks = await TaskModel.find({ project: projectId, owner: req.user._id }).sort({ createdAt: 1 });
+    
+    // Non-blocking asynchronous analysis of overdue/due-soon parameters
+    analyzeDueDatesAndNotify(tasks, req.user._id).catch(err => {
+      console.error("Async due date checker failure:", err);
+    });
+
     return res.status(200).json({ tasks });
   } catch (error) {
     console.error("Get Tasks error:", error);
@@ -76,6 +146,7 @@ const updateTask = async (req, res) => {
     }
 
     const { title, description, status, priority, dueDate } = req.body;
+    const originalStatus = task.status;
 
     if (title !== undefined) task.title = title;
     if (description !== undefined) task.description = description;
@@ -84,6 +155,56 @@ const updateTask = async (req, res) => {
     if (dueDate !== undefined) task.dueDate = dueDate;
 
     await task.save();
+
+    // Log the specific type of task modification
+    let activityType = "task_updated";
+    let activityMessage = `Task "${task.title}" was updated.`;
+
+    if (status !== undefined && status !== originalStatus) {
+      if (status === "completed") {
+        activityType = "task_completed";
+        activityMessage = `Task "${task.title}" was completed!`;
+      } else {
+        activityType = "task_status_changed";
+        const oldLabel = originalStatus === 'in-progress' ? 'In Progress' : originalStatus === 'todo' ? 'Todo' : 'Completed';
+        const newLabel = status === 'in-progress' ? 'In Progress' : status === 'todo' ? 'Todo' : 'Completed';
+        activityMessage = `Task "${task.title}" moved from "${oldLabel}" to "${newLabel}".`;
+      }
+    }
+
+    await logActivity({
+      type: activityType,
+      message: activityMessage,
+      projectId: task.project,
+      taskId: task._id,
+      ownerId: req.user._id,
+      metadata: { originalStatus, newStatus: status }
+    });
+
+    // Log Workspace Notification
+    if (status !== undefined && status !== originalStatus) {
+      if (status === "completed") {
+        await logNotification({
+          type: "task_completed",
+          title: "Task Completed",
+          message: `Task "${task.title}" has been marked as Completed!`,
+          userId: req.user._id,
+          projectId: task.project,
+          taskId: task._id
+        });
+      } else {
+        const oldLabel = originalStatus === 'in-progress' ? 'In Progress' : originalStatus === 'todo' ? 'Todo' : 'Completed';
+        const newLabel = status === 'in-progress' ? 'In Progress' : status === 'todo' ? 'Todo' : 'Completed';
+        await logNotification({
+          type: "task_moved",
+          title: "Task Status Updated",
+          message: `Task "${task.title}" moved from "${oldLabel}" to "${newLabel}".`,
+          userId: req.user._id,
+          projectId: task.project,
+          taskId: task._id
+        });
+      }
+    }
 
     return res.status(200).json({ message: "Task updated successfully", task });
   } catch (error) {
@@ -106,6 +227,24 @@ const deleteTask = async (req, res) => {
     if (task.owner.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Access denied. You do not own this task." });
     }
+
+    // Log task deletion activity
+    await logActivity({
+      type: "task_deleted",
+      message: `Task "${task.title}" was deleted.`,
+      projectId: task.project,
+      ownerId: req.user._id
+    });
+
+    // Log Workspace Notification
+    await logNotification({
+      type: "task_deleted",
+      title: "Task Deleted",
+      message: `Task "${task.title}" was deleted.`,
+      userId: req.user._id,
+      projectId: task.project,
+      taskId: task._id
+    });
 
     await TaskModel.deleteOne({ _id: req.params.id });
 

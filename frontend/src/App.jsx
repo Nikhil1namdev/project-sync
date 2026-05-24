@@ -28,7 +28,7 @@ function App() {
     <>
       <Toaster position="bottom-right" reverseOrder={false} />
       <LoginProvider>
-        <GoogleOAuthProvider clientId="843511444668-02r1n0sh9upm0cqg9qjuaptfruq2brb9.apps.googleusercontent.com">
+        <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
           <Router>
             <Routes>
               <Route path="/" element={<Home />} />

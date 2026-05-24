@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient';
 import { 
   Settings, 
   FolderKanban, 
@@ -88,9 +88,7 @@ const FinalDashboard = () => {
     if (!token) return;
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:8000/api/projects', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await apiClient.get('/api/projects');
       setProjects(response.data.projects || []);
     } catch (error) {
       console.error("Fetch Projects Error:", error);
@@ -173,15 +171,11 @@ const FinalDashboard = () => {
 
       if (editingProject) {
         // PATCH update request
-        await axios.patch(`http://localhost:8000/api/projects/${editingProject._id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await apiClient.patch(`/api/projects/${editingProject._id}`, payload);
         showToast.success("Project updated successfully!");
       } else {
         // POST create request
-        await axios.post('http://localhost:8000/api/projects', payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await apiClient.post('/api/projects', payload);
         showToast.success("Project created successfully!");
       }
 
@@ -207,9 +201,7 @@ const FinalDashboard = () => {
     if (!projectToDelete) return;
     setDeleteSubmitting(true);
     try {
-      await axios.delete(`http://localhost:8000/api/projects/${projectToDelete._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiClient.delete(`/api/projects/${projectToDelete._id}`);
       showToast.success("Project successfully deleted.");
       setShowDeleteModal(false);
       fetchProjects(); // Reload list

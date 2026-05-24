@@ -27,7 +27,7 @@ const Login = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, email: user.email, name: user.name },
       JWTSecretKey,
-      { expiresIn: "1h" }
+      { expiresIn: "30d" }
     );
 
     return res.status(200).json({
@@ -97,7 +97,7 @@ const GoogleAuth = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, email: user.email },
       process.env.JWT_SECRET_KEY,
-      { expiresIn: "1h" }
+      { expiresIn: "30d" }
     );
 
     res.status(200).json({

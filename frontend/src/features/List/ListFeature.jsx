@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import Thead from '../../components/ListComponents/Thead';
 import TRow from '../../components/ListComponents/TRow';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient.js';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
 import { showToast } from '../../utils/toast.js';
 
@@ -28,7 +28,7 @@ const ListFeature = () => {
 
   const fetchData = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/List/getList');
+      const response = await apiClient.get('/List/getList');
       setRows(response.data.reverse());
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -38,7 +38,7 @@ const ListFeature = () => {
   const handlePost = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('http://localhost:8000/List/NewList', newRow);
+      const response = await apiClient.post('/List/NewList', newRow);
 
       // Optimistically update UI
       setRows((prevRows) => [response.data, ...prevRows]);

@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../utils/apiClient';
 import { 
   Settings, 
   FolderKanban, 
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
 import { showToast } from '../../utils/toast';
+import NotificationBell from '../../components/NotificationBell/NotificationBell';
 
 const UserDashboard = () => {
   const [activeItem, setActiveItem] = useState('Dashboard');
@@ -88,9 +89,7 @@ const UserDashboard = () => {
     if (!token) return;
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:8000/api/projects', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await apiClient.get('/api/projects');
       setProjects(response.data.projects || []);
     } catch (error) {
       console.error("Fetch Projects Error:", error);
@@ -173,15 +172,11 @@ const UserDashboard = () => {
 
       if (editingProject) {
         // PATCH update request
-        await axios.patch(`http://localhost:8000/api/projects/${editingProject._id}`, payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await apiClient.patch(`/api/projects/${editingProject._id}`, payload);
         showToast.success("Project updated successfully!");
       } else {
         // POST create request
-        await axios.post('http://localhost:8000/api/projects', payload, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await apiClient.post('/api/projects', payload);
         showToast.success("Project created successfully!");
       }
 
@@ -207,9 +202,7 @@ const UserDashboard = () => {
     if (!projectToDelete) return;
     setDeleteSubmitting(true);
     try {
-      await axios.delete(`http://localhost:8000/api/projects/${projectToDelete._id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiClient.delete(`/api/projects/${projectToDelete._id}`);
       showToast.success("Project successfully deleted.");
       setShowDeleteModal(false);
       fetchProjects(); // Reload list
@@ -314,6 +307,8 @@ const UserDashboard = () => {
           </div>
           
           <div className="flex items-center space-x-3.5">
+            <NotificationBell />
+
             <button
               onClick={handleJiraClick}
               className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer text-slate-700 dark:text-slate-200"

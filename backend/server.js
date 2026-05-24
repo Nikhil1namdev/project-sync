@@ -12,6 +12,8 @@ import ProjectRoutes from './Routes/ProjectRoutes.js';
 import TaskRoutes from './Routes/TaskRoutes.js';
 import { saveMessage } from "./controller/messageControllerss.js";
 import MessageRoutes from './Routes/MessageRoutes.js';
+import ActivityRoutes from './Routes/ActivityRoutes.js';
+import NotificationRoutes from './Routes/NotificationRoutes.js';
 dotenv.config();
 ConnectDB();
 
@@ -25,6 +27,8 @@ app.use("/auth", AuthRoutes);
 app.use("/api/projects", ProjectRoutes);
 app.use("/api/tasks", TaskRoutes);
 app.use("/messages", MessageRoutes);
+app.use("/api/activity", ActivityRoutes);
+app.use("/api/notifications", NotificationRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello from the Atlassian Backend!");

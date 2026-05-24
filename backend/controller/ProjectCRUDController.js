@@ -1,4 +1,6 @@
 import ProjectModel from "../Models/ProjectModel.js";
+import { logActivity } from "../utils/activityLogger.js";
+import { logNotification } from "../utils/notificationLogger.js";
 
 // CREATE PROJECT
 // POST /api/projects
@@ -18,6 +20,23 @@ const createProject = async (req, res) => {
       startDate,
       dueDate,
       owner: req.user._id
+    });
+
+    // Log project creation activity
+    await logActivity({
+      type: "project_created",
+      message: `Project "${project.title}" was created successfully.`,
+      projectId: project._id,
+      ownerId: req.user._id
+    });
+
+    // Log Workspace Notification
+    await logNotification({
+      type: "project_created",
+      title: "New Project Created",
+      message: `Project "${project.title}" has been created as a new workspace.`,
+      userId: req.user._id,
+      projectId: project._id
     });
 
     return res.status(201).json({ message: "Project created successfully", project });
@@ -87,6 +106,23 @@ const updateProject = async (req, res) => {
     if (dueDate !== undefined) project.dueDate = dueDate;
 
     await project.save();
+
+    // Log project update activity
+    await logActivity({
+      type: "project_updated",
+      message: `Project parameters for "${project.title}" were updated.`,
+      projectId: project._id,
+      ownerId: req.user._id
+    });
+
+    // Log Workspace Notification
+    await logNotification({
+      type: "project_updated",
+      title: "Project Parameters Updated",
+      message: `Project workspace "${project.title}" has been modified.`,
+      userId: req.user._id,
+      projectId: project._id
+    });
 
     return res.status(200).json({ message: "Project updated successfully", project });
   } catch (error) {

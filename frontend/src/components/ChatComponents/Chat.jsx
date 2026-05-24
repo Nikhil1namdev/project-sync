@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
 
 // INTERVIEW NOTE: Establishes a persistent TCP WebSocket handshake connection with Port 8000
-const socket = io('http://localhost:8000'); // backend URL
+const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'); // backend URL
 
 const Chat = () => {
   const [message, setMessage] = useState('');
