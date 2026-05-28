@@ -7,7 +7,7 @@ import { showToast } from '../../utils/toast.js';
 
 const LoginOne = () => {
   const navigate = useNavigate();
-  const { setLogin, setUser } = useContext(LoginContext);
+  const { setLogin, setUser, setUserEmail, setProfilePic } = useContext(LoginContext);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,6 +32,8 @@ const LoginOne = () => {
       const obj = { email: userEmail, name, token, profilepic };
       
       setUser(obj.name);
+      setUserEmail(obj.email);
+      setProfilePic(obj.profilepic || null);
       localStorage.setItem('userInfo', JSON.stringify(obj));
       setLogin(true);
       
@@ -60,6 +62,8 @@ const LoginOne = () => {
         const obj = { email: userEmail, name, token, profilepic };
         
         setUser(obj.name);
+        setUserEmail(obj.email);
+        setProfilePic(obj.profilepic || null);
         localStorage.setItem('userInfo', JSON.stringify(obj));
         setLogin(true);
 
