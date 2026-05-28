@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
@@ -110,15 +110,18 @@ export default function JiraDashboard() {
       {/* 1. SIDEBAR PANEL */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200/80 p-4 justify-between select-none">
         <div className="space-y-6">
-          {/* Logo element */}
-          <div className="flex items-center space-x-2.5 px-2 py-1.5 border-b border-slate-100 pb-4">
-            <div className="flex items-center justify-center w-6.5 h-6.5 rounded-md bg-blue-600 text-white font-black text-xs shadow-sm">
+          {/* Logo element - Clickable to return to public homepage */}
+          <Link 
+            to="/" 
+            className="flex items-center space-x-2.5 px-2 py-1.5 border-b border-slate-100 pb-4 group cursor-pointer"
+          >
+            <div className="flex items-center justify-center w-6.5 h-6.5 rounded-md bg-blue-600 text-white font-black text-xs shadow-sm group-hover:scale-105 transition-transform">
               P
             </div>
             <span className="text-[14px] font-bold text-slate-800 tracking-tight">
               Project-<span className="text-blue-600">Sync</span> Workspace
             </span>
-          </div>
+          </Link>
 
           {/* User profile identifier with Dropdown Trigger */}
           <div className="relative">

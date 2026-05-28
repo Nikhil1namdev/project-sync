@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../../utils/apiClient';
 import { 
   Settings, 
@@ -220,15 +220,18 @@ const FinalDashboard = () => {
       {/* Sidebar */}
       <div className="w-64 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between select-none border-r border-slate-200/60 dark:border-slate-800 relative">
         <div>
-          {/* Project-Sync Branding */}
-          <div className="flex items-center space-x-2.5 px-6 py-5 border-b border-slate-100 dark:border-slate-800 pb-4 mb-8">
-            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600 text-white font-black text-xs shadow-md shadow-blue-500/10">
+          {/* Project-Sync Branding - Clickable to return to public homepage */}
+          <Link 
+            to="/" 
+            className="flex items-center space-x-2.5 px-6 py-5 border-b border-slate-100 dark:border-slate-800 pb-4 mb-8 group cursor-pointer"
+          >
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600 text-white font-black text-xs shadow-md shadow-blue-500/10 group-hover:scale-105 transition-transform">
               P
             </div>
             <span className="text-[15px] font-bold text-slate-800 dark:text-white tracking-tight">
               Project-<span className="text-blue-600">Sync</span>
             </span>
-          </div>
+          </Link>
 
           <nav className="space-y-1.5 px-4">
             <NavItem label="Dashboard" active={activeItem === "Dashboard"} onClick={handleNavClick} icon={<Layers className="w-4 h-4" />} />
