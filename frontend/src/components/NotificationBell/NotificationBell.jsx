@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Check, Trash, Plus, AlertCircle, Calendar, X, FolderKanban, CheckSquare, Edit } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Check, Trash, Plus, AlertCircle, Calendar, X, FolderKanban, CheckSquare, Edit, UserCheck, MessageSquare } from 'lucide-react';
 import apiClient from '../../utils/apiClient';
 import { showToast } from '../../utils/toast';
 
@@ -8,6 +9,7 @@ const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
 
   const fetchNotifications = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -79,6 +81,16 @@ const NotificationBell = () => {
     }
   };
 
+  const handleNotificationClick = async (item) => {
+    if (!item.isRead) {
+      await handleMarkAsRead(item._id);
+    }
+    if (item.link) {
+      navigate(item.link);
+      setIsOpen(false);
+    }
+  };
+
   // Human-readable relative time conversion
   const getRelativeTime = (dateString) => {
     const now = new Date();
@@ -98,47 +110,34 @@ const NotificationBell = () => {
 
   // Get icons and Tailwind styles dynamically mapping to notification type
   const getTypeConfig = (type) => {
-    switch (type) {
-      case 'task_completed':
+    const typeUpper = (type || '').toUpperCase();
+    switch (typeUpper) {
+      case 'TASK_ASSIGNED':
+        return {
+          icon: <UserCheck className="w-4 h-4 text-blue-500 dark:text-blue-400" />,
+          bgColor: 'bg-blue-500/10 border-blue-500/20 dark:bg-blue-950/20 dark:border-blue-900/30'
+        };
+      case 'TASK_COMPLETED':
         return {
           icon: <CheckSquare className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />,
           bgColor: 'bg-emerald-500/10 border-emerald-500/20 dark:bg-emerald-950/20 dark:border-emerald-900/30'
         };
-      case 'task_created':
-        return {
-          icon: <Plus className="w-4 h-4 text-blue-500 dark:text-blue-400" />,
-          bgColor: 'bg-blue-500/10 border-blue-500/20 dark:bg-blue-950/20 dark:border-blue-900/30'
-        };
-      case 'task_deleted':
-        return {
-          icon: <Trash className="w-4 h-4 text-rose-500 dark:text-rose-400" />,
-          bgColor: 'bg-rose-500/10 border-rose-500/20 dark:bg-rose-955/20 dark:border-rose-900/30'
-        };
-      case 'task_moved':
-        return {
-          icon: <FolderKanban className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />,
-          bgColor: 'bg-indigo-500/10 border-indigo-500/20 dark:bg-indigo-950/20 dark:border-indigo-900/30'
-        };
-      case 'due_soon':
+      case 'TASK_DUE_SOON':
         return {
           icon: <Calendar className="w-4 h-4 text-amber-500 dark:text-amber-400 animate-pulse" />,
           bgColor: 'bg-amber-500/10 border-amber-500/20 dark:bg-amber-955/20 dark:border-amber-900/30'
         };
-      case 'overdue':
+      case 'TASK_OVERDUE':
         return {
           icon: <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 animate-bounce" />,
           bgColor: 'bg-red-500/15 border-red-500/30 dark:bg-red-955/20 dark:border-red-900/40'
         };
-      case 'project_created':
+      case 'PROJECT_INVITATION':
         return {
-          icon: <Plus className="w-4 h-4 text-sky-500 dark:text-sky-400" />,
-          bgColor: 'bg-sky-500/10 border-sky-500/20 dark:bg-sky-955/20 dark:border-sky-900/30'
-        };
-      case 'project_updated':
-        return {
-          icon: <Edit className="w-4 h-4 text-violet-500 dark:text-violet-400" />,
+          icon: <FolderKanban className="w-4 h-4 text-violet-500 dark:text-violet-400" />,
           bgColor: 'bg-violet-500/10 border-violet-500/20 dark:bg-violet-955/20 dark:border-violet-900/30'
         };
+      case 'GENERAL':
       default:
         return {
           icon: <Bell className="w-4 h-4 text-slate-500 dark:text-slate-400" />,
@@ -152,7 +151,7 @@ const NotificationBell = () => {
       {/* Bell Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-650 dark:text-slate-300 transition duration-200 cursor-pointer focus:outline-none flex items-center justify-center"
+        className="relative p-2.5 rounded-xl border border-slate-200 dark:border-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-slate-650 dark:text-slate-350 transition duration-200 cursor-pointer focus:outline-none flex items-center justify-center bg-white dark:bg-slate-900"
       >
         <Bell className={`w-4 h-4 ${unreadCount > 0 ? 'text-blue-600 dark:text-blue-400 animate-pulse' : ''}`} />
         
@@ -180,7 +179,7 @@ const NotificationBell = () => {
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer focus:outline-none"
+                className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer focus:outline-none bg-transparent border-0"
               >
                 Mark all read
               </button>
@@ -193,9 +192,9 @@ const NotificationBell = () => {
               /* Premium Empty State */
               <div className="flex flex-col items-center justify-center py-14 px-6 text-center select-none">
                 <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-900/40 flex items-center justify-center mb-3">
-                  <Bell className="w-5 h-5 text-slate-350 dark:text-slate-600" />
+                  <Bell className="w-5 h-5 text-slate-350 dark:text-slate-650" />
                 </div>
-                <h4 className="text-xs font-bold text-slate-850 dark:text-slate-200">You are all caught up!</h4>
+                <h4 className="text-xs font-bold text-slate-850 dark:text-slate-200">No notifications yet</h4>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 max-w-[220px]">
                   New updates from projects and tasks will appear here in real time.
                 </p>
@@ -209,14 +208,20 @@ const NotificationBell = () => {
                     className={`flex items-start gap-3 p-4 transition-all duration-150 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 ${!item.isRead ? 'bg-blue-50/10 dark:bg-blue-950/10' : ''}`}
                   >
                     {/* Color Coded Icon Container */}
-                    <div className={`p-2 rounded-xl border ${config.bgColor} shrink-0`}>
+                    <div 
+                      onClick={() => handleNotificationClick(item)}
+                      className={`p-2 rounded-xl border ${config.bgColor} shrink-0 cursor-pointer hover:scale-105 transition-transform`}
+                    >
                       {config.icon}
                     </div>
 
                     {/* Content area */}
                     <div className="flex-1 overflow-hidden">
                       <div className="flex items-center justify-between gap-2">
-                        <span className={`text-xs font-bold leading-none ${!item.isRead ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
+                        <span 
+                          onClick={() => handleNotificationClick(item)}
+                          className={`text-xs font-bold leading-none cursor-pointer hover:text-blue-600 transition-colors ${!item.isRead ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-450'}`}
+                        >
                           {item.title}
                         </span>
                         <span className="text-[9px] font-semibold text-slate-400 shrink-0">
@@ -224,7 +229,10 @@ const NotificationBell = () => {
                         </span>
                       </div>
                       
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed break-words text-left">
+                      <p 
+                        onClick={() => handleNotificationClick(item)}
+                        className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 leading-relaxed break-words text-left cursor-pointer"
+                      >
                         {item.message}
                       </p>
 
@@ -233,7 +241,7 @@ const NotificationBell = () => {
                         {!item.isRead && (
                           <button
                             onClick={() => handleMarkAsRead(item._id)}
-                            className="flex items-center space-x-1 text-[10px] font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer focus:outline-none"
+                            className="flex items-center space-x-1 text-[10px] font-extrabold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer focus:outline-none bg-transparent border-0"
                           >
                             <Check className="w-3 h-3" />
                             <span>Mark read</span>
@@ -241,7 +249,7 @@ const NotificationBell = () => {
                         )}
                         <button
                           onClick={() => handleDelete(item._id)}
-                          className="flex items-center space-x-1 text-[10px] font-extrabold text-slate-400 hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-400 cursor-pointer focus:outline-none"
+                          className="flex items-center space-x-1 text-[10px] font-extrabold text-slate-400 hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-400 cursor-pointer focus:outline-none bg-transparent border-0"
                         >
                           <Trash className="w-3 h-3" />
                           <span>Delete</span>

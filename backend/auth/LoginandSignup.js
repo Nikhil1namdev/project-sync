@@ -229,4 +229,15 @@ const ResetPassword = async (req, res) => {
   }
 };
 
-export { GoogleAuth, Login, Signup, ForgotPassword, ResetPassword };
+// GET ALL REGISTERED USERS FOR ASSIGNEE SELECTION
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await UserModel.find({}, "name email profilepic");
+    return res.status(200).json({ users });
+  } catch (error) {
+    console.error("Get All Users error:", error);
+    return res.status(500).json({ message: "Server error while fetching users list." });
+  }
+};
+
+export { GoogleAuth, Login, Signup, ForgotPassword, ResetPassword, getAllUsers };

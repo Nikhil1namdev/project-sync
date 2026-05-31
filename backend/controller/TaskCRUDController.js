@@ -1,13 +1,13 @@
 import TaskModel from "../Models/TaskModel.js";
 import ProjectModel from "../Models/ProjectModel.js";
 import { logActivity } from "../utils/activityLogger.js";
-import { logNotification } from "../utils/notificationLogger.js";
+import { logNotification, createNotification } from "../utils/notificationLogger.js";
 
 // CREATE TASK
 // POST /api/tasks
 const createTask = async (req, res) => {
   try {
-    const { title, description, status, priority, dueDate, projectId } = req.body;
+    const { title, description, status, priority, dueDate, projectId, assignee } = req.body;
 
     if (!title || !dueDate || !projectId) {
       return res.status(400).json({ message: "Title, Due Date, and Project ID are required." });
@@ -29,7 +29,8 @@ const createTask = async (req, res) => {
       priority,
       dueDate,
       project: projectId,
-      owner: req.user._id
+      owner: req.user._id,
+      assignee: assignee || null
     });
 
     // Log activity on task creation
@@ -41,7 +42,7 @@ const createTask = async (req, res) => {
       ownerId: req.user._id
     });
 
-    // Log Workspace Notification
+    // Log Workspace Notification (Legacy compatible)
     await logNotification({
       type: "task_created",
       title: "New Task Created",
@@ -50,6 +51,20 @@ const createTask = async (req, res) => {
       projectId: projectId,
       taskId: task._id
     });
+
+    // Trigger TASK_ASSIGNED notification if assignee is present
+    if (task.assignee) {
+      await createNotification({
+        recipient: task.assignee,
+        sender: req.user._id,
+        type: "TASK_ASSIGNED",
+        title: "New task assigned",
+        message: `${req.user.name || "A user"} assigned you a task: ${task.title}`,
+        entityType: "task",
+        entityId: task._id,
+        link: `/project/${projectId}`
+      });
+    }
 
     return res.status(201).json({ message: "Task created successfully", task });
   } catch (error) {
@@ -107,16 +122,16 @@ const getTasksByProject = async (req, res) => {
   try {
     const { projectId } = req.params;
 
-    // Verify project ownership
+    // Verify project exists
     const project = await ProjectModel.findById(projectId);
     if (!project) {
       return res.status(404).json({ message: "Project not found." });
     }
-    if (project.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Access denied. You do not own this project." });
-    }
 
-    const tasks = await TaskModel.find({ project: projectId, owner: req.user._id }).sort({ createdAt: 1 });
+    // Retrieve all tasks associated with this project (shared workspace collaboration)
+    const tasks = await TaskModel.find({ project: projectId })
+      .populate("assignee", "name email profilepic")
+      .sort({ createdAt: 1 });
     
     // Non-blocking asynchronous analysis of overdue/due-soon parameters
     analyzeDueDatesAndNotify(tasks, req.user._id).catch(err => {
@@ -140,19 +155,23 @@ const updateTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found." });
     }
 
-    // Verify task ownership
-    if (task.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Access denied. You do not own this task." });
+    // Verify task authorization (Allow project owner, task creator, OR assigned user to update)
+    const isOwner = task.owner.toString() === req.user._id.toString();
+    const isAssignee = task.assignee && task.assignee.toString() === req.user._id.toString();
+    if (!isOwner && !isAssignee) {
+      return res.status(403).json({ message: "Access denied. You are not authorized to update this task." });
     }
 
-    const { title, description, status, priority, dueDate } = req.body;
+    const { title, description, status, priority, dueDate, assignee } = req.body;
     const originalStatus = task.status;
+    const originalAssignee = task.assignee;
 
     if (title !== undefined) task.title = title;
     if (description !== undefined) task.description = description;
     if (status !== undefined) task.status = status;
     if (priority !== undefined) task.priority = priority;
     if (dueDate !== undefined) task.dueDate = dueDate;
+    if (assignee !== undefined) task.assignee = assignee || null;
 
     await task.save();
 
@@ -181,7 +200,7 @@ const updateTask = async (req, res) => {
       metadata: { originalStatus, newStatus: status }
     });
 
-    // Log Workspace Notification
+    // Log Workspace Notification (Legacy compatible)
     if (status !== undefined && status !== originalStatus) {
       if (status === "completed") {
         await logNotification({
@@ -202,6 +221,36 @@ const updateTask = async (req, res) => {
           userId: req.user._id,
           projectId: task.project,
           taskId: task._id
+        });
+      }
+    }
+
+    // Trigger TASK_ASSIGNED notification if assignee is newly added or changed
+    if (task.assignee && (!originalAssignee || originalAssignee.toString() !== task.assignee.toString())) {
+      await createNotification({
+        recipient: task.assignee,
+        sender: req.user._id,
+        type: "TASK_ASSIGNED",
+        title: "New task assigned",
+        message: `${req.user.name || "A user"} assigned you a task: ${task.title}`,
+        entityType: "task",
+        entityId: task._id,
+        link: `/project/${task.project}`
+      });
+    }
+
+    // Trigger TASK_COMPLETED notification if status is completed by someone else
+    if (status === "completed" && status !== originalStatus) {
+      if (task.owner && task.owner.toString() !== req.user._id.toString()) {
+        await createNotification({
+          recipient: task.owner,
+          sender: req.user._id,
+          type: "TASK_COMPLETED",
+          title: "Task completed",
+          message: `${req.user.name || "A user"} completed your task: ${task.title}`,
+          entityType: "task",
+          entityId: task._id,
+          link: `/project/${task.project}`
         });
       }
     }

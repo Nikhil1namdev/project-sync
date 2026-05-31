@@ -27,17 +27,49 @@ import ToDolist from '../../features/ToDolist';
 import Jira from './Jira';
 import ChatFeature from '../../features/ChatFeature/ChatFeature';
 import Chat from '../../components/ChatComponents/Chat';
+import CalendarFeature from '../../features/CalendarFeature';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
 import { showToast } from '../../utils/toast';
+import NotificationBell from '../../components/NotificationBell/NotificationBell';
+import GlobalCreateModal from '../../components/GlobalCreateModal/GlobalCreateModal';
 
 export default function JiraDashboard() {
-  const { User, setLogin, setUser, setToken } = useContext(LoginContext);
+  const { User, setLogin, setUser, setToken, getRedirectPath } = useContext(LoginContext);
   const [activeTab, setActiveTab] = useState('Summary');
   const [searchQuery, setSearchQuery] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const navigate = useNavigate();
+
+  // Route security: Check auth and active workspace context on mount/reload
+  useEffect(() => {
+    const stored = localStorage.getItem('userInfo');
+    if (!stored) {
+      showToast.error("Authentication required. Please log in first.");
+      navigate('/Login', { replace: true });
+      return;
+    }
+
+    const verifyWorkspaceContext = async () => {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.token) {
+          const correctPath = await getRedirectPath(parsed.token);
+          if (correctPath !== '/JiraDashboard') {
+            showToast.error("No active projects found. Redirecting to onboarder.");
+            navigate('/UserDashboard', { replace: true });
+          }
+        }
+      } catch (err) {
+        console.error("Direct access workspace verify error:", err);
+        navigate('/UserDashboard', { replace: true });
+      }
+    };
+
+    verifyWorkspaceContext();
+  }, [navigate, getRedirectPath]);
 
   // Secure Logout action clearing local state and route cache
   const handleLogout = () => {
@@ -83,7 +115,7 @@ export default function JiraDashboard() {
     { name: 'Settings', icon: Settings, tab: 'Summary' }
   ];
 
-  const tabs = ['Summary', 'ToDo ', 'Create List/Forms', 'Starred', 'Assigned to me', 'Chat', 'NewChat'];
+  const tabs = ['Summary', 'ToDo ', 'Create List/Forms', 'Calendar', 'Starred', 'Assigned to me', 'Chat', 'NewChat'];
 
   const stats = [
     { title: 'Open work items', count: 4, desc: 'Needs review', color: 'text-blue-600 bg-blue-50' },
@@ -105,10 +137,10 @@ export default function JiraDashboard() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#F8FAFC] font-sans text-slate-800 overflow-hidden">
+    <div className="flex h-screen w-full bg-[#F8FAFC] dark:bg-slate-950 font-sans text-slate-850 dark:text-slate-100 overflow-hidden">
       
       {/* 1. SIDEBAR PANEL */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200/80 p-4 justify-between select-none">
+      <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 p-4 justify-between select-none">
         <div className="space-y-6">
           {/* Logo element - Clickable to return to public homepage */}
           <Link 
@@ -118,7 +150,7 @@ export default function JiraDashboard() {
             <div className="flex items-center justify-center w-6.5 h-6.5 rounded-md bg-blue-600 text-white font-black text-xs shadow-sm group-hover:scale-105 transition-transform">
               P
             </div>
-            <span className="text-[14px] font-bold text-slate-800 tracking-tight">
+            <span className="text-[14px] font-bold text-slate-800 dark:text-slate-100 tracking-tight">
               Project-<span className="text-blue-600">Sync</span> Workspace
             </span>
           </Link>
@@ -127,7 +159,7 @@ export default function JiraDashboard() {
           <div className="relative">
             <div 
               onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex items-center justify-between bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 cursor-pointer select-none hover:bg-slate-100/50 transition duration-150"
+              className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-750 transition duration-150"
             >
               <div className="flex items-center space-x-3 overflow-hidden">
                 {userProfile?.profilepic && !imgError ? (
@@ -153,10 +185,10 @@ export default function JiraDashboard() {
 
             {/* Premium Profile Actions Overlay */}
             {showProfileMenu && (
-              <div className="absolute bottom-16 left-0 right-0 bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-xl rounded-2xl p-2 z-50 select-none">
-                <div className="px-2 py-1.5 border-b border-slate-100 mb-2">
-                  <div className="font-bold text-slate-800 text-[12px] truncate">{userName}</div>
-                  <div className="text-[9px] text-slate-400 font-semibold truncate">{userProfile?.email || 'Developer Member'}</div>
+              <div className="absolute bottom-16 left-0 right-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-2xl p-2 z-50 select-none text-slate-805 dark:text-slate-100">
+                <div className="px-2 py-1.5 border-b border-slate-100 dark:border-slate-700 mb-2">
+                  <div className="font-bold text-slate-800 dark:text-slate-100 text-[12px] truncate">{userName}</div>
+                  <div className="text-[9px] text-slate-400 dark:text-slate-450 font-semibold truncate">{userProfile?.email || 'Developer Member'}</div>
                 </div>
                 <button 
                   onClick={() => { setShowProfileMenu(false); navigate('/UserDashboard'); }}
@@ -198,8 +230,8 @@ export default function JiraDashboard() {
                   onClick={() => handleSidebarClick(link)}
                   className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-bold tracking-tight transition duration-150 cursor-pointer ${
                     isActive 
-                      ? 'bg-blue-50/60 text-blue-600 border-l-2 border-blue-600'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      ? 'bg-blue-50/60 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-l-2 border-blue-600 dark:border-blue-500'
+                      : 'text-slate-650 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <IconComp className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
@@ -224,13 +256,13 @@ export default function JiraDashboard() {
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         
         {/* Top Header / Greeting Bar */}
-        <header className="bg-white border-b border-slate-200/80 h-14 px-6 flex items-center justify-between shrink-0 select-none">
+        <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 h-14 px-6 flex items-center justify-between shrink-0 select-none">
           <div className="flex items-center space-x-4">
-            <h2 className="text-[14px] font-bold text-slate-800">
-              Welcome back, <span className="text-blue-600">{User || 'Developer'}</span>
+            <h2 className="text-[14px] font-bold text-slate-800 dark:text-slate-100">
+              Welcome back, <span className="text-blue-600 dark:text-blue-400">{User || 'Developer'}</span>
             </h2>
-            <span className="w-px h-4 bg-slate-200"></span>
-            <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200/30">
+            <span className="w-px h-4 bg-slate-200 dark:bg-slate-750"></span>
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-200/30 dark:border-slate-700/30">
               ⚡ Sprint Alpha Workspace
             </span>
           </div>
@@ -244,12 +276,14 @@ export default function JiraDashboard() {
                 placeholder="Search issues, chats..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-56 bg-slate-50 border border-slate-200 rounded-lg py-1.5 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder-slate-400 transition"
+                className="w-56 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg py-1.5 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 dark:text-white placeholder-slate-400 transition"
               />
             </div>
             
+            <NotificationBell />
+
             <button 
-              onClick={() => showToast.warning("Creating tasks via shortcut is available inside the Board/Spreadsheet tab!")}
+              onClick={() => setShowCreateModal(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -262,7 +296,7 @@ export default function JiraDashboard() {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           
           {/* Main Workspace Navigation Tabs */}
-          <div className="flex items-center space-x-1 border-b border-slate-200 shrink-0 select-none">
+          <div className="flex items-center space-x-1 border-b border-slate-200 dark:border-slate-800 shrink-0 select-none">
             {tabs.map((tab) => {
               const isActive = activeTab === tab;
               return (
@@ -271,11 +305,11 @@ export default function JiraDashboard() {
                   onClick={() => setActiveTab(tab)}
                   className={`relative pb-2.5 px-4 text-xs font-bold transition duration-150 cursor-pointer ${
                     isActive 
-                      ? 'text-blue-600 border-b-2 border-blue-600'
-                      : 'text-slate-500 hover:text-slate-800'
+                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-500'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  {tab === 'ToDo ' ? '📋 Kanban Board' : tab === 'Create List/Forms' ? '📊 Issue Tracker' : tab === 'NewChat' ? '💬 Thread Chat' : tab}
+                  {tab === 'ToDo ' ? '📋 Kanban Board' : tab === 'Create List/Forms' ? '📊 Issue Tracker' : tab === 'Calendar' ? '📅 Calendar' : tab === 'NewChat' ? '💬 Thread Chat' : tab}
                   {tab === 'Assigned to me' && (
                     <span className="ml-1.5 bg-blue-100 text-blue-600 text-[10px] rounded-full px-1.5 py-0.2 font-black">
                       4
@@ -300,13 +334,13 @@ export default function JiraDashboard() {
                   
                   {/* Row 1: Workspace progress summary card */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-white border border-slate-200/80 p-5 rounded-2xl shadow-sm space-y-4">
+                    <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="text-lg font-extrabold text-slate-800">Sprint Alpha Pipeline</h3>
-                          <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Project-Sync Core Delivery</p>
+                          <h3 className="text-lg font-extrabold text-slate-800 dark:text-white">Sprint Alpha Pipeline</h3>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-450 font-bold uppercase tracking-wider mt-0.5">Project-Sync Core Delivery</p>
                         </div>
-                        <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                        <span className="text-[11px] font-bold text-blue-600 dark:text-blue-450 bg-blue-50 dark:bg-blue-955/20 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-900/30">
                           Active Sprint
                         </span>
                       </div>
@@ -359,10 +393,10 @@ export default function JiraDashboard() {
                     {/* Stats Widget grid */}
                     <div className="grid grid-cols-2 gap-4">
                       {stats.map((stat, idx) => (
-                        <div key={idx} className="bg-white border border-slate-200/80 p-4 rounded-2xl shadow-sm flex flex-col justify-between">
-                          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{stat.title}</div>
+                        <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col justify-between">
+                          <div className="text-[11px] font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider">{stat.title}</div>
                           <div className="mt-2.5">
-                            <span className="text-2xl font-black text-slate-800">{stat.count}</span>
+                            <span className="text-2xl font-black text-slate-800 dark:text-white">{stat.count}</span>
                             <span className="block text-[10px] font-bold text-slate-400 mt-0.5">{stat.desc}</span>
                           </div>
                         </div>
@@ -371,8 +405,8 @@ export default function JiraDashboard() {
                   </div>
 
                   {/* Row 2: Recent Activity / Documentation Preview */}
-                  <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm space-y-4">
-                    <h4 className="text-sm font-extrabold text-slate-800 border-b border-slate-100 pb-2.5">🎯 Workspace Sprint Directives</h4>
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-4">
+                    <h4 className="text-sm font-extrabold text-slate-800 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-2.5">🎯 Workspace Sprint Directives</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2 text-xs font-bold text-blue-600">
@@ -400,15 +434,22 @@ export default function JiraDashboard() {
 
               {/* Kanban tab */}
               {activeTab === 'ToDo ' && (
-                <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
                   <ToDolist />
                 </div>
               )}
 
               {/* Issue spreadsheet tracker tab */}
               {activeTab === 'Create List/Forms' && (
-                <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
                   <Jira />
+                </div>
+              )}
+
+              {/* Calendar tab */}
+              {activeTab === 'Calendar' && (
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
+                  <CalendarFeature />
                 </div>
               )}
 
@@ -470,14 +511,14 @@ export default function JiraDashboard() {
 
               {/* Socket Chat feature */}
               {activeTab === 'Chat' && (
-                <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
                   <ChatFeature />
                 </div>
               )}
 
               {/* Thread Chat alternative */}
               {activeTab === 'NewChat' && (
-                <div className="bg-white border border-slate-200/80 p-6 rounded-2xl shadow-sm">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm">
                   <Chat />
                 </div>
               )}
@@ -489,33 +530,33 @@ export default function JiraDashboard() {
       </main>
 
       {/* 3. RIGHT INSIGHTS PANEL */}
-      <aside className="hidden xl:flex flex-col w-80 bg-white border-l border-slate-200/80 p-5 shrink-0 select-none space-y-6">
+      <aside className="hidden xl:flex flex-col w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 p-5 shrink-0 select-none space-y-6">
         <div>
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Project Insights</h4>
+          <h4 className="text-xs font-bold text-slate-400 dark:text-slate-450 uppercase tracking-wider mb-3">Project Insights</h4>
           
           {/* Project health card */}
-          <div className="bg-blue-50/50 border border-blue-100/50 p-4.5 rounded-2xl space-y-3.5 shadow-sm">
+          <div className="bg-blue-50/50 dark:bg-slate-800 border border-blue-100/50 dark:border-slate-700 p-4.5 rounded-2xl space-y-3.5 shadow-sm animate-in fade-in duration-300">
             <div className="flex items-center space-x-2">
               <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
                 PS
               </div>
               <div>
-                <h5 className="text-[12px] font-extrabold text-slate-800">Project-Sync Health</h5>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Workspace Health Index</p>
+                <h5 className="text-[12px] font-extrabold text-slate-800 dark:text-white">Project-Sync Health</h5>
+                <p className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase tracking-wider">Workspace Health Index</p>
               </div>
             </div>
 
             <div className="space-y-1">
               <div className="flex justify-between text-[11px] font-bold">
-                <span className="text-slate-500">Sprint Delivery Speed</span>
-                <span className="text-blue-600">Excellent</span>
+                <span className="text-slate-500 dark:text-slate-400">Sprint Delivery Speed</span>
+                <span className="text-blue-600 dark:text-blue-450">Excellent</span>
               </div>
-              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                <div className="bg-blue-600 h-full rounded-full w-[90%]"></div>
+              <div className="w-full bg-slate-100 dark:bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                <div className="bg-blue-600 dark:bg-blue-500 h-full rounded-full w-[90%]"></div>
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-500 leading-relaxed">
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed font-semibold">
               Prioritize visual features inside your Kanban board, then seamlessly track progress metrics live across active user sessions.
             </p>
           </div>
@@ -523,24 +564,24 @@ export default function JiraDashboard() {
 
         {/* Sprint progress highlights */}
         <div className="space-y-3.5">
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Collaboration Index</h4>
+          <h4 className="text-xs font-bold text-slate-400 dark:text-slate-550 uppercase tracking-wider">Collaboration Index</h4>
           
-          <div className="bg-slate-50/80 border border-slate-100 p-4 rounded-xl space-y-3">
-            <div className="flex items-center space-x-2.5 text-xs font-bold text-slate-700">
-              <TrendingUp className="w-4 h-4 text-purple-600" />
+          <div className="bg-slate-50/80 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4 rounded-xl space-y-3">
+            <div className="flex items-center space-x-2.5 text-xs font-bold text-slate-800 dark:text-white">
+              <TrendingUp className="w-4 h-4 text-purple-650 dark:text-purple-400" />
               <span>Real-time Chat Activity</span>
             </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed font-semibold">
               Real-time synchronization operates over direct websocket connection hooks. Launch sprint discussions inside the chat tab.
             </p>
           </div>
 
-          <div className="bg-slate-50/80 border border-slate-100 p-4 rounded-xl space-y-3">
-            <div className="flex items-center space-x-2.5 text-xs font-bold text-slate-700">
-              <User2 className="w-4 h-4 text-emerald-600" />
+          <div className="bg-slate-50/80 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-4 rounded-xl space-y-3">
+            <div className="flex items-center space-x-2.5 text-xs font-bold text-slate-800 dark:text-white">
+              <User2 className="w-4 h-4 text-emerald-650 dark:text-emerald-400" />
               <span>User Session Management</span>
             </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed font-semibold">
               Google SSO integration is active. Accounts are successfully bound to verified developer workspace session contexts.
             </p>
           </div>
@@ -625,6 +666,15 @@ export default function JiraDashboard() {
         </div>
       )}
 
+      {/* Global Creation Modal */}
+      <GlobalCreateModal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          window.dispatchEvent(new CustomEvent('refresh-tasks'));
+          window.dispatchEvent(new CustomEvent('refresh-projects'));
+        }}
+      />
     </div>
   );
 }

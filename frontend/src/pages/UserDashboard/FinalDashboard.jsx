@@ -176,7 +176,10 @@ const FinalDashboard = () => {
       } else {
         // POST create request
         await apiClient.post('/api/projects', payload);
-        showToast.success("Project created successfully!");
+        showToast.success("Project created successfully! Loading workspace...");
+        setTimeout(() => {
+          navigate('/JiraDashboard');
+        }, 1000);
       }
 
       setShowProjectModal(false);

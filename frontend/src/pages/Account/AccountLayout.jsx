@@ -1,16 +1,13 @@
 import React, { useContext } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import {
-  User, Mail, Shield, Lock, Settings,
-  Link as LinkIcon, Package, ChevronLeft
-} from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext.js';
 
 /**
  * AccountLayout — Shared shell for all /account/* pages.
- * Provides the left-side navigation tabs and top header,
- * matching Atlassian's "Account Settings" look.
+ * Centered content, top horizontal nav tabs, premium dark-mode support,
+ * matching Atlassian's clean account settings UI.
  */
 const AccountLayout = () => {
   const navigate = useNavigate();
@@ -22,92 +19,87 @@ const AccountLayout = () => {
   };
 
   const navItems = [
-    { to: '/account/profile-and-visibility', label: 'Profile and visibility', icon: User     },
-    { to: '/account/email',                  label: 'Email',                   icon: Mail     },
-    { to: '/account/security',               label: 'Security',                icon: Lock     },
-    { to: '/account/privacy',                label: 'Privacy',                 icon: Shield   },
-    { to: '/account/preferences',            label: 'Account preferences',     icon: Settings },
-    { to: '/account/connected-apps',         label: 'Connected apps',          icon: LinkIcon },
-    { to: '/account/link-preferences',       label: 'Link preferences',        icon: Package  },
-    { to: '/account/product-settings',       label: 'Product settings',        icon: Settings },
+    { to: '/account/profile-and-visibility', label: 'Profile and visibility' },
+    { to: '/account/email',                  label: 'Email'                  },
+    { to: '/account/security',               label: 'Security'               },
+    { to: '/account/privacy',                label: 'Privacy'                },
+    { to: '/account/preferences',            label: 'Account preferences'    },
+    { to: '/account/connected-apps',         label: 'Connected apps'         },
+    { to: '/account/link-preferences',       label: 'Link preferences'       },
+    { to: '/account/product-settings',       label: 'Product settings'       },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       
-      {/* Top Account Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-4">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-500 hover:text-blue-600 transition cursor-pointer"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Back to Home
-          </button>
-          <span className="w-px h-4 bg-slate-200" />
+      {/* Top Account Header - Atlassian Style */}
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {profilePic ? (
-              <img src={profilePic} alt={userName} className="w-8 h-8 rounded-full object-cover ring-2 ring-blue-100" />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs">
-                {getInitials(userName)}
-              </div>
-            )}
-            <div>
-              <p className="text-[13px] font-bold text-slate-800 leading-tight">{userName || 'User'}</p>
-              <p className="text-[11px] text-slate-500 leading-tight">{userEmail || ''}</p>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-1.5 text-[12.5px] font-extrabold text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back
+            </button>
+            <span className="w-px h-4 bg-slate-200 dark:bg-slate-800" />
+            <div className="flex items-center gap-2">
+              {profilePic ? (
+                <img src={profilePic} alt={userName} className="w-7 h-7 rounded-full object-cover ring-2 ring-blue-100 dark:ring-blue-900/30" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-[10px]">
+                  {getInitials(userName)}
+                </div>
+              )}
+              <span className="text-[12.5px] font-bold text-slate-700 dark:text-slate-350 truncate hidden sm:inline max-w-[120px]">
+                {userName || 'User'}
+              </span>
             </div>
           </div>
-          <div className="ml-auto">
-            <span className="text-[13px] font-black text-slate-700">
-              Project-<span className="text-blue-600">Sync</span> · Account Settings
+          
+          <div>
+            <span className="text-[14px] font-black text-slate-850 dark:text-slate-200 tracking-tight">
+              PROJECT-SYNC <span className="font-light text-slate-500 dark:text-slate-450">Account</span>
             </span>
           </div>
         </div>
+      </header>
+
+      {/* Top Horizontal Nav Tabs */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-[53px] z-30 overflow-x-auto scrollbar-none">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 flex gap-5 md:gap-6">
+          {navItems.map(({ to, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `pb-2.5 pt-3 px-0.5 border-b-2 text-[13px] font-bold transition-colors whitespace-nowrap cursor-pointer block ${
+                  isActive
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700'
+                }`
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+        </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex gap-8">
-
-        {/* LEFT: Navigation Sidebar */}
-        <aside className="hidden md:block w-56 flex-shrink-0">
-          <nav className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Account</p>
-            </div>
-            <ul className="py-1.5">
-              {navItems.map(({ to, label, icon: Icon }) => (
-                <li key={to}>
-                  <NavLink
-                    to={to}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-4 py-2.5 text-[13px] font-semibold transition-colors cursor-pointer ${
-                        isActive
-                          ? 'text-blue-600 bg-blue-50 border-r-2 border-blue-600'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                      }`
-                    }
-                  >
-                    <Icon className="w-4 h-4 flex-shrink-0" />
-                    <span>{label}</span>
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </aside>
-
-        {/* RIGHT: Page Content */}
-        <main className="flex-1 min-w-0">
+      {/* Centered Main Page Content */}
+      <div className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-8">
+        <main className="min-w-0">
           <motion.div
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
+            transition={{ duration: 0.2 }}
           >
             <Outlet />
           </motion.div>
         </main>
       </div>
+
     </div>
   );
 };

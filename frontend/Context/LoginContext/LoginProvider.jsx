@@ -49,6 +49,55 @@ const LoginProvider = ({ children }) => {
   }, []);
 
   /**
+   * getRedirectPath — Centralized method to evaluate active workspace context.
+   * Fetches projects from backend to decide if user should land on JiraDashboard or UserDashboard.
+   */
+  const decodeToken = (jwtToken) => {
+    if (!jwtToken) return null;
+    try {
+      const base64Url = jwtToken.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        window.atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error("Token decoding failed:", e);
+      return null;
+    }
+  };
+
+  const getRedirectPath = useCallback(async (userToken) => {
+    const activeToken = userToken || token || getStoredUserInfo()?.token;
+    if (!activeToken) return '/Login';
+    try {
+      const response = await axios.get(`${apiBase}/api/projects`, {
+        headers: { Authorization: `Bearer ${activeToken}` }
+      });
+      const list = response.data.projects || [];
+      
+      // Decode JWT token to retrieve logged-in user's ID
+      const decoded = decodeToken(activeToken);
+      const userId = decoded?.id;
+      
+      // Filter projects owned by this user
+      const userProjects = list.filter(p => p.owner === userId);
+      
+      if (userProjects.length > 0) {
+        return '/JiraDashboard';
+      } else {
+        return '/UserDashboard';
+      }
+    } catch (error) {
+      console.error("Error in getRedirectPath:", error);
+      return '/UserDashboard';
+    }
+  }, [token, apiBase]);
+
+  /**
    * On app mount: silently verify stored JWT with backend.
    * - If token valid   → refresh user data from server (keeps name/email fresh).
    * - If token invalid → clear stale session automatically.
@@ -105,6 +154,7 @@ const LoginProvider = ({ children }) => {
       profilePic, setProfilePic,
       authChecked,
       logOut,
+      getRedirectPath,
     }}>
       {children}
     </CreateLoginContext.Provider>

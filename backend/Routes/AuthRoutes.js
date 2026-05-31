@@ -1,5 +1,5 @@
 import express from 'express'
-import { Login, Signup, GoogleAuth, ForgotPassword, ResetPassword } from '../auth/LoginandSignup.js';
+import { Login, Signup, GoogleAuth, ForgotPassword, ResetPassword, getAllUsers } from '../auth/LoginandSignup.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router=express.Router();
@@ -10,6 +10,7 @@ router.post("/forgot-password", ForgotPassword);
 router.post("/reset-password", ResetPassword);
 router.post("/google-auth", GoogleAuth);
 router.get("/google-auth", GoogleAuth);
+router.get("/users", protect, getAllUsers);
 
 // Token verification endpoint — called on app load to confirm stored token is still valid
 router.get("/verify", protect, (req, res) => {

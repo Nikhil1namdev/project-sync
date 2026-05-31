@@ -7,7 +7,7 @@ import { showToast } from '../../utils/toast.js';
 
 const LoginOne = () => {
   const navigate = useNavigate();
-  const { setLogin, setUser, setUserEmail, setProfilePic } = useContext(LoginContext);
+  const { setLogin, setUser, setUserEmail, setProfilePic, getRedirectPath } = useContext(LoginContext);
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,10 +17,18 @@ const LoginOne = () => {
 
   // Auto-redirect if already logged in to prevent back-navigation to login page
   React.useEffect(() => {
-    if (localStorage.getItem('userInfo')) {
-      navigate('/JiraDashboard');
+    const stored = localStorage.getItem('userInfo');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.token) {
+          getRedirectPath(parsed.token).then(path => navigate(path, { replace: true }));
+        }
+      } catch (e) {
+        console.error("Error evaluating redirect path in LoginOne:", e);
+      }
     }
-  }, [navigate]);
+  }, [navigate, getRedirectPath]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -38,7 +46,8 @@ const LoginOne = () => {
       setLogin(true);
       
       showToast.success("Logged in successfully! Welcome back.");
-      navigate('/JiraDashboard');
+      const redirectPath = await getRedirectPath(token);
+      navigate(redirectPath);
     } catch (error) {
       console.error(error);
       const msg = error.response?.data?.message;
@@ -68,7 +77,8 @@ const LoginOne = () => {
         setLogin(true);
 
         showToast.success("Logged in successfully with Google!");
-        navigate('/UserDashboard');
+        const redirectPath = await getRedirectPath(token);
+        navigate(redirectPath);
       } else {
         throw new Error("No authorization code returned from Google");
       }

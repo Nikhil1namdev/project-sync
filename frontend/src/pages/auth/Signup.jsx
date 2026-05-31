@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import apiClient from '../../utils/apiClient.js';
 import { Link, useNavigate } from 'react-router-dom';
 import { showToast } from '../../utils/toast.js';
+import LoginContext from '../../../Context/LoginContext/CreateLoginContext.js';
 
 const SignUp = () => {
   const navigate = useNavigate();
+  const { getRedirectPath } = useContext(LoginContext);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -17,10 +19,18 @@ const SignUp = () => {
 
   // Auto-redirect if already logged in to prevent back-navigation to signup page
   React.useEffect(() => {
-    if (localStorage.getItem('userInfo')) {
-      navigate('/JiraDashboard');
+    const stored = localStorage.getItem('userInfo');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed?.token) {
+          getRedirectPath(parsed.token).then(path => navigate(path, { replace: true }));
+        }
+      } catch (e) {
+        console.error("Error evaluating redirect path in Signup:", e);
+      }
     }
-  }, [navigate]);
+  }, [navigate, getRedirectPath]);
 
   const handleChange = (e) => {
     setFormData(prev => ({

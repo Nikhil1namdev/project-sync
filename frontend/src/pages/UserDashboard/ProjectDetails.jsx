@@ -23,6 +23,9 @@ import {
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext';
 import { showToast } from '../../utils/toast';
 import NotificationBell from '../../components/NotificationBell/NotificationBell';
+import { getTaskDueStatus } from '../../utils/dueStatusHelper';
+import TaskDueBadge from '../../components/TaskDueBadge/TaskDueBadge';
+import GlobalCreateModal from '../../components/GlobalCreateModal/GlobalCreateModal';
 
 const ProjectDetails = () => {
   const { id: projectId } = useParams();
@@ -46,6 +49,8 @@ const ProjectDetails = () => {
   const [taskPriority, setTaskPriority] = useState('medium');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskSubmitting, setTaskSubmitting] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [taskAssignee, setTaskAssignee] = useState('');
 
   // Active Task Filter States
   const [statusFilter, setStatusFilter] = useState('all');
@@ -118,31 +123,6 @@ const ProjectDetails = () => {
     return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  // Due status helper
-  const getTaskDueStatus = (task) => {
-    if (!task || !task.dueDate || task.status === 'completed') {
-      return 'normal';
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const dueDateObj = new Date(task.dueDate);
-    dueDateObj.setHours(0, 0, 0, 0);
-
-    if (dueDateObj < today) {
-      return 'overdue';
-    }
-
-    const twoDaysLater = new Date(today);
-    twoDaysLater.setDate(today.getDate() + 2);
-
-    if (dueDateObj >= today && dueDateObj <= twoDaysLater) {
-      return 'due-soon';
-    }
-
-    return 'normal';
-  };
-
   // FETCH PROJECT DATA BY ID
   const fetchProjectDetails = async () => {
     if (!token) return;
@@ -189,11 +169,23 @@ const ProjectDetails = () => {
     }
   };
 
+  // FETCH USERS FOR ASSIGNEE SELECTOR
+  const fetchUsers = async () => {
+    if (!token) return;
+    try {
+      const response = await apiClient.get('/auth/users');
+      setUsers(response.data.users || []);
+    } catch (error) {
+      console.error("Fetch Users Error:", error);
+    }
+  };
+
   useEffect(() => {
     if (token) {
       fetchProjectDetails();
       fetchTasks();
       fetchActivities();
+      fetchUsers();
     } else {
       navigate('/Login');
     }
@@ -278,6 +270,7 @@ const ProjectDetails = () => {
     setTaskStatus('todo');
     setTaskPriority('medium');
     setTaskDueDate(new Date().toISOString().split('T')[0]);
+    setTaskAssignee('');
     setShowTaskModal(true);
   };
 
@@ -289,6 +282,7 @@ const ProjectDetails = () => {
     setTaskStatus(task.status || 'todo');
     setTaskPriority(task.priority || 'medium');
     setTaskDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
+    setTaskAssignee(task.assignee?._id || task.assignee || '');
     setShowTaskModal(true);
   };
 
@@ -308,7 +302,8 @@ const ProjectDetails = () => {
         status: taskStatus,
         priority: taskPriority,
         dueDate: taskDueDate,
-        projectId: projectId
+        projectId: projectId,
+        assignee: taskAssignee || null
       };
 
       if (editingTask) {
@@ -457,16 +452,7 @@ const ProjectDetails = () => {
             <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded border uppercase ${priorityStyles[task.priority || 'medium']}`}>
               {task.priority}
             </span>
-            {dueStatus === 'overdue' && (
-              <span className="bg-rose-500 text-white dark:bg-rose-955/40 dark:text-rose-400 border border-rose-600/20 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded select-none animate-pulse">
-                Overdue
-              </span>
-            )}
-            {dueStatus === 'due-soon' && (
-              <span className="bg-amber-500 text-white dark:bg-amber-955/40 dark:text-amber-400 border border-amber-600/20 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded select-none">
-                Due Soon
-              </span>
-            )}
+            <TaskDueBadge task={task} />
           </div>
           
           <div className="flex space-x-1 shrink-0">
@@ -504,15 +490,27 @@ const ProjectDetails = () => {
             <span>Due: {formatDate(task.dueDate)}</span>
           </span>
 
-          <span className={`text-[8px] font-black uppercase px-2 py-0.25 rounded border shrink-0 ${
-            task.status === 'completed' 
-              ? "bg-green-50/50 text-green-600 border-green-200/50 dark:bg-green-955/10 dark:text-green-400" 
-              : task.status === 'in-progress' 
-              ? "bg-blue-50/50 text-blue-600 border-blue-200/50 dark:bg-blue-955/10 dark:text-blue-400" 
-              : "bg-slate-100/50 text-slate-500 border-slate-200/50 dark:bg-slate-800/10 dark:text-slate-400"
-          }`}>
-            {task.status === 'in-progress' ? 'In Progress' : task.status}
-          </span>
+          <div className="flex items-center space-x-2">
+            {task.assignee ? (
+              <div 
+                className="w-5 h-5 bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30 rounded-full flex items-center justify-center font-black text-[9px] uppercase shadow-sm"
+                title={`Assigned to ${task.assignee.name || 'Member'}`}
+              >
+                {getInitials(task.assignee.name || 'U')}
+              </div>
+            ) : (
+              <span className="text-[10px] text-slate-350 dark:text-slate-655" title="Unassigned">👤</span>
+            )}
+            <span className={`text-[8px] font-black uppercase px-2 py-0.25 rounded border shrink-0 ${
+              task.status === 'completed' 
+                ? "bg-green-50/50 text-green-600 border-green-200/50 dark:bg-green-955/10 dark:text-green-400" 
+                : task.status === 'in-progress' 
+                ? "bg-blue-50/50 text-blue-600 border-blue-200/50 dark:bg-blue-955/10 dark:text-blue-400" 
+                : "bg-slate-100/50 text-slate-500 border-slate-200/50 dark:bg-slate-800/10 dark:text-slate-400"
+            }`}>
+              {task.status === 'in-progress' ? 'In Progress' : task.status}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -992,19 +990,20 @@ const ProjectDetails = () => {
                     {/* Metadata actions row */}
                     <div className="border-t border-slate-100 dark:border-slate-800/80 pt-3.5 mt-2 flex items-center justify-between text-[10px]">
                       <div className="flex items-center space-x-2 pl-6.5">
+                        {task.assignee ? (
+                          <div 
+                            className="w-5 h-5 bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-900/30 rounded-full flex items-center justify-center font-black text-[9px] uppercase shadow-sm"
+                            title={`Assigned to ${task.assignee.name || 'Member'}`}
+                          >
+                            {getInitials(task.assignee.name || 'U')}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-355 dark:text-slate-655" title="Unassigned">👤</span>
+                        )}
                         <span className={`px-2 py-0.5 rounded border font-semibold ${priorityStyles[task.priority || 'medium']}`}>
                           {task.priority}
                         </span>
-                        {dueStatus === 'overdue' && (
-                          <span className="bg-rose-500 text-white dark:bg-rose-955/40 dark:text-rose-400 border border-rose-600/20 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded select-none animate-pulse">
-                            Overdue
-                          </span>
-                        )}
-                        {dueStatus === 'due-soon' && (
-                          <span className="bg-amber-500 text-white dark:bg-amber-955/40 dark:text-amber-400 border border-amber-600/20 text-[8px] font-black tracking-wider uppercase px-2 py-0.5 rounded select-none">
-                            Due Soon
-                          </span>
-                        )}
+                        <TaskDueBadge task={task} />
                         
                         <span className={`${dateColorClass} flex items-center space-x-1`}>
                           <Calendar className="w-3.5 h-3.5" />
@@ -1129,134 +1128,17 @@ const ProjectDetails = () => {
       </div>
 
       {/* CREATE / EDIT TASK MODAL OVERLAY */}
-      {showTaskModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 max-w-lg w-full p-6 sm:p-8 shadow-2xl relative select-none animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            
-            {/* Header */}
-            <div className="mb-6 flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                {editingTask ? 'Modify Task Sprint' : 'Add New Task Sprint'}
-              </h3>
-              <button 
-                onClick={() => setShowTaskModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleTaskSubmit} className="space-y-5">
-              
-              {/* Title */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                  Task Title *
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Implement middleware routes"
-                  value={taskTitle}
-                  onChange={(e) => setTaskTitle(e.target.value)}
-                  required
-                  disabled={taskSubmitting}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:opacity-50 text-sm font-semibold"
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                  Description Details
-                </label>
-                <textarea
-                  placeholder="Detail the target goals of this sprint task..."
-                  value={taskDesc}
-                  onChange={(e) => setTaskDesc(e.target.value)}
-                  rows="3"
-                  disabled={taskSubmitting}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:opacity-50 text-sm font-medium resize-none"
-                />
-              </div>
-
-              {/* Grid status & priority */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                {/* Status */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                    Task Status
-                  </label>
-                  <select
-                    value={taskStatus}
-                    onChange={(e) => setTaskStatus(e.target.value)}
-                    disabled={taskSubmitting}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm font-semibold cursor-pointer"
-                  >
-                    <option value="todo">Todo 📋</option>
-                    <option value="in-progress">In Progress 🚀</option>
-                    <option value="completed">Completed ✅</option>
-                  </select>
-                </div>
-
-                {/* Priority */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                    Task Priority
-                  </label>
-                  <select
-                    value={taskPriority}
-                    onChange={(e) => setTaskPriority(e.target.value)}
-                    disabled={taskSubmitting}
-                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm font-semibold cursor-pointer"
-                  >
-                    <option value="low">Low Priority 🟢</option>
-                    <option value="medium">Medium Priority 🟡</option>
-                    <option value="high">High Priority 🔴</option>
-                  </select>
-                </div>
-
-              </div>
-
-              {/* Due Date */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-extrabold">
-                  Task Due Date *
-                </label>
-                <input
-                  type="date"
-                  value={taskDueDate}
-                  onChange={(e) => setTaskDueDate(e.target.value)}
-                  required
-                  disabled={taskSubmitting}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm font-semibold cursor-pointer"
-                />
-              </div>
-
-              {/* Actions Footer */}
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex space-x-3.5 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setShowTaskModal(false)}
-                  disabled={taskSubmitting}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-black dark:text-black font-extrabold text-xs transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={taskSubmitting}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-md shadow-blue-500/10 transition flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
-                >
-                  {taskSubmitting ? <span>Saving...</span> : <span>Save Task</span>}
-                </button>
-              </div>
-
-            </form>
-
-          </div>
-        </div>
-      )}
+      <GlobalCreateModal 
+        isOpen={showTaskModal}
+        onClose={() => setShowTaskModal(false)}
+        initialProjectId={projectId}
+        initialType="task"
+        taskToEdit={editingTask}
+        onSuccess={() => {
+          fetchTasks(); // Refresh tasks grid
+          window.dispatchEvent(new CustomEvent('refresh-tasks'));
+        }}
+      />
 
       {/* DELETE CONFIRMATION MODAL OVERLAY */}
       {showDeleteModal && (

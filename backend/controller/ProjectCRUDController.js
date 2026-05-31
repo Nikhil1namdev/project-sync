@@ -50,8 +50,8 @@ const createProject = async (req, res) => {
 // GET /api/projects
 const getProjects = async (req, res) => {
   try {
-    // Only return projects belonging to the logged-in user
-    const projects = await ProjectModel.find({ owner: req.user._id }).sort({ createdAt: -1 });
+    // Return all projects in the workspace so team members can collaborate
+    const projects = await ProjectModel.find({}).sort({ createdAt: -1 });
     return res.status(200).json({ projects });
   } catch (error) {
     console.error("Get Projects error:", error);
@@ -69,11 +69,7 @@ const getProjectById = async (req, res) => {
       return res.status(404).json({ message: "Project not found." });
     }
 
-    // Verify ownership
-    if (project.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Access denied. You do not own this project." });
-    }
-
+    // Allow all logged-in team members to view the project workspace
     return res.status(200).json({ project });
   } catch (error) {
     console.error("Get Project By ID error:", error);

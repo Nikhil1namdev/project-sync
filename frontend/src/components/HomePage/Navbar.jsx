@@ -1,9 +1,11 @@
 import React, { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Grid, ChevronDown, Menu, X } from 'lucide-react';
+import { Search, Grid, ChevronDown, Menu, X, Bell } from 'lucide-react';
 import LoginContext from '../../../Context/LoginContext/CreateLoginContext.js';
+import CreateNotificationContext from '../../../Context/NotificationContext/CreateNotificationContext.js';
 import AccountDropdown from './AccountDropdown.jsx';
+import NotificationDropdown from './NotificationDropdown.jsx';
 
 /**
  * Navbar — Auth-aware top navigation bar.
@@ -21,8 +23,10 @@ const Navbar = () => {
   const [activeMenu, setActiveMenu]       = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen]   = useState(false);
+  const [notifOpen, setNotifOpen]         = useState(false);
 
   const { login, User, profilePic } = useContext(LoginContext);
+  const { unreadCount } = useContext(CreateNotificationContext);
 
   const handleMouseEnter = (menuName) => setActiveMenu(menuName);
   const handleMouseLeave = ()         => setActiveMenu(null);
@@ -184,38 +188,63 @@ const Navbar = () => {
 
             {/* ─── LOGGED IN: Avatar + Name + Dropdown ─── */}
             {login ? (
-              <div className="relative">
-                <button
-                  id="nav-account-btn"
-                  onClick={() => setDropdownOpen(prev => !prev)}
-                  className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group"
-                  aria-label="Open account menu"
-                  aria-expanded={dropdownOpen}
-                >
-                  {/* Avatar */}
-                  {profilePic ? (
-                    <img
-                      src={profilePic}
-                      alt={User}
-                      className="w-7 h-7 rounded-full object-cover ring-2 ring-blue-100"
-                    />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-[11px] shadow-sm flex-shrink-0">
-                      {getInitials(User)}
-                    </div>
-                  )}
-                  {/* Name */}
-                  <span className="text-[13px] font-bold text-slate-700 group-hover:text-blue-600 transition max-w-[120px] truncate">
-                    {User}
-                  </span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180 text-blue-500' : ''}`} />
-                </button>
+              <div className="flex items-center gap-3">
+                {/* Notification Bell */}
+                <div className="relative">
+                  <button
+                    id="nav-bell-btn"
+                    onClick={() => setNotifOpen(prev => !prev)}
+                    className="relative text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white p-2 hover:bg-slate-50 dark:hover:bg-slate-800/60 rounded-xl transition cursor-pointer flex items-center justify-center"
+                    aria-label="Toggle notifications menu"
+                    aria-expanded={notifOpen}
+                  >
+                    <Bell className={`w-4 h-4 transition-transform duration-200 ${notifOpen ? 'rotate-12 text-blue-600' : ''}`} />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9.5px] font-bold text-white ring-2 ring-white dark:ring-slate-900">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
 
-                {/* Account Dropdown */}
-                <AccountDropdown
-                  isOpen={dropdownOpen}
-                  onClose={() => setDropdownOpen(false)}
-                />
+                  <NotificationDropdown
+                    isOpen={notifOpen}
+                    onClose={() => setNotifOpen(false)}
+                  />
+                </div>
+
+                <div className="relative">
+                  <button
+                    id="nav-account-btn"
+                    onClick={() => setDropdownOpen(prev => !prev)}
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer group"
+                    aria-label="Open account menu"
+                    aria-expanded={dropdownOpen}
+                  >
+                    {/* Avatar */}
+                    {profilePic ? (
+                      <img
+                        src={profilePic}
+                        alt={User}
+                        className="w-7 h-7 rounded-full object-cover ring-2 ring-blue-100"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-[11px] shadow-sm flex-shrink-0">
+                        {getInitials(User)}
+                      </div>
+                    )}
+                    {/* Name */}
+                    <span className="text-[13px] font-bold text-slate-700 group-hover:text-blue-600 transition max-w-[120px] truncate">
+                      {User}
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180 text-blue-500' : ''}`} />
+                  </button>
+
+                  {/* Account Dropdown */}
+                  <AccountDropdown
+                    isOpen={dropdownOpen}
+                    onClose={() => setDropdownOpen(false)}
+                  />
+                </div>
               </div>
             ) : (
               /* ─── LOGGED OUT: Login + Sign up ─── */
@@ -237,10 +266,31 @@ const Navbar = () => {
           </div>
 
           {/* Hamburger Mobile Toggle */}
-          <div className="flex lg:hidden items-center">
+          <div className="flex lg:hidden items-center gap-2">
+            {login && (
+              <div className="relative">
+                <button
+                  id="nav-bell-mobile-btn"
+                  onClick={() => setNotifOpen(prev => !prev)}
+                  className="relative text-slate-500 hover:text-slate-800 p-2 hover:bg-slate-50 rounded-xl transition cursor-pointer flex items-center justify-center"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white ring-2 ring-white dark:ring-slate-900">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+                <NotificationDropdown
+                  isOpen={notifOpen}
+                  onClose={() => setNotifOpen(false)}
+                />
+              </div>
+            )}
+
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-slate-500 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-50"
+              className="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-50 cursor-pointer"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
